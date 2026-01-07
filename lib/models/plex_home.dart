@@ -1,12 +1,20 @@
 import 'plex_home_user.dart';
 
+/// Plex Home（家庭组）模型
 class PlexHome {
+  /// 家庭组 ID
   final int id;
+  /// 家庭组名称
   final String name;
+  /// 访客用户 ID
   final int? guestUserID;
+  /// 访客用户 UUID
   final String guestUserUUID;
+  /// 是否启用访客
   final bool guestEnabled;
+  /// 是否有订阅
   final bool subscription;
+  /// 家庭组内的用户列表
   final List<PlexHomeUser> users;
 
   PlexHome({
@@ -46,12 +54,16 @@ class PlexHome {
     };
   }
 
+  /// 获取管理员用户
   PlexHomeUser? get adminUser => users.where((user) => user.admin).firstOrNull;
 
+  /// 获取托管用户列表（非管理员）
   List<PlexHomeUser> get managedUsers => users.where((user) => !user.admin).toList();
 
+  /// 获取受限用户列表
   List<PlexHomeUser> get restrictedUsers => users.where((user) => user.restricted).toList();
 
+  /// 根据 UUID 获取用户
   PlexHomeUser? getUserByUUID(String uuid) {
     try {
       return users.firstWhere((user) => user.uuid == uuid);
@@ -60,5 +72,6 @@ class PlexHome {
     }
   }
 
+  /// 检查是否有多个用户
   bool get hasMultipleUsers => users.length > 1;
 }

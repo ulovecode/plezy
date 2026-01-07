@@ -24,11 +24,11 @@ extension ProviderExtensions on BuildContext {
 
   HiddenLibrariesProvider watchHiddenLibraries() => Provider.of<HiddenLibrariesProvider>(this, listen: true);
 
-  // Direct profile settings access (nullable)
+  // 直接访问个人资料设置（可为空）
   PlexUserProfile? get profileSettings => userProfile.profileSettings;
 
-  /// Get PlexClient for a specific server ID
-  /// Throws an exception if no client is available for the given serverId
+  /// 获取特定服务器 ID 的 PlexClient
+  /// 如果给定 serverId 没有可用的客户端，则抛出异常
   PlexClient getClientForServer(String serverId) {
     final multiServerProvider = Provider.of<MultiServerProvider>(this, listen: false);
 
@@ -42,10 +42,10 @@ extension ProviderExtensions on BuildContext {
     return serverClient;
   }
 
-  /// Get PlexClient for a library
-  /// Throws an exception if no client is available
+  /// 获取媒体库的 PlexClient
+  /// 如果没有可用的客户端，则抛出异常
   PlexClient getClientForLibrary(PlexLibrary library) {
-    // If library doesn't have a serverId, fall back to first available server
+    // 如果媒体库没有 serverId，则回退到第一个可用的服务器
     if (library.serverId == null) {
       final multiServerProvider = Provider.of<MultiServerProvider>(this, listen: false);
       if (!multiServerProvider.hasConnectedServers) {
@@ -56,8 +56,8 @@ extension ProviderExtensions on BuildContext {
     return getClientForServer(library.serverId!);
   }
 
-  /// Get PlexClient for metadata, with fallback to first available server
-  /// Throws an exception if no servers are available
+  /// 获取元数据的 PlexClient，如果元数据中没有 serverId 则回退到第一个可用的服务器
+  /// 如果没有可用的服务器，则抛出异常
   PlexClient getClientForMetadata(PlexMetadata metadata) {
     if (metadata.serverId != null) {
       return getClientForServer(metadata.serverId!);
@@ -65,8 +65,8 @@ extension ProviderExtensions on BuildContext {
     return getFirstAvailableClient();
   }
 
-  /// Get PlexClient for metadata, or null if offline mode or no serverId
-  /// Use this for screens that support offline mode
+  /// 获取元数据的 PlexClient，如果是离线模式或没有 serverId 则返回 null
+  /// 用于支持离线模式的屏幕
   PlexClient? getClientForMetadataOrNull(PlexMetadata metadata, {bool isOffline = false}) {
     if (isOffline || metadata.serverId == null) {
       return null;
@@ -74,8 +74,8 @@ extension ProviderExtensions on BuildContext {
     return getClientForServer(metadata.serverId!);
   }
 
-  /// Get the first available client from connected servers
-  /// Throws an exception if no servers are available
+  /// 从连接的服务器中获取第一个可用的客户端
+  /// 如果没有可用的服务器，则抛出异常
   PlexClient getFirstAvailableClient() {
     final multiServerProvider = Provider.of<MultiServerProvider>(this, listen: false);
     if (!multiServerProvider.hasConnectedServers) {
@@ -84,8 +84,8 @@ extension ProviderExtensions on BuildContext {
     return getClientForServer(multiServerProvider.onlineServerIds.first);
   }
 
-  /// Get client for a serverId with fallback to first available server
-  /// Useful for items that might not have a serverId
+  /// 获取 serverId 的客户端，并带有回退到第一个可用服务器的逻辑
+  /// 适用于可能没有 serverId 的项目
   PlexClient getClientWithFallback(String? serverId) {
     if (serverId != null) {
       return getClientForServer(serverId);

@@ -1,14 +1,24 @@
 import 'package:package_info_plus/package_info_plus.dart';
 
+/// Plex 客户端配置模型
 class PlexConfig {
+  /// 服务器基础 URL
   final String baseUrl;
+  /// 身份验证令牌
   final String? token;
+  /// 客户端唯一标识符
   final String clientIdentifier;
+  /// 产品名称（例如：Plezy）
   final String product;
+  /// 版本号
   final String version;
+  /// 平台名称
   final String platform;
+  /// 设备名称
   final String? device;
+  /// 是否接受 JSON 响应
   final bool acceptJson;
+  /// 服务器机器标识符
   final String? machineIdentifier;
 
   PlexConfig({
@@ -23,6 +33,8 @@ class PlexConfig {
     this.machineIdentifier,
   });
 
+  /// 创建一个新的 PlexConfig 实例
+  /// 自动从平台获取版本号
   static Future<PlexConfig> create({
     required String baseUrl,
     String? token,
@@ -47,6 +59,7 @@ class PlexConfig {
     );
   }
 
+  /// 获取用于 API 请求的 HTTP 请求头
   Map<String, String> get headers {
     final headers = {
       'X-Plex-Client-Identifier': clientIdentifier,

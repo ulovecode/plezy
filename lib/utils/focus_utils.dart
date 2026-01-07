@@ -1,13 +1,13 @@
 import 'package:flutter/widgets.dart';
 
-/// Utility class for common focus operations
+/// 常用焦点操作的工具类
 class FocusUtils {
   FocusUtils._();
 
-  /// Request focus on a FocusNode after the current frame completes.
-  /// Safely checks if the State is still mounted before requesting focus.
+  /// 在当前帧构建完成后请求 FocusNode 获得焦点。
+  /// 在请求焦点之前，安全地检查 State 是否仍处于挂载（mounted）状态。
   ///
-  /// Usage:
+  /// 用法：
   /// ```dart
   /// FocusUtils.requestFocusAfterBuild(this, _focusNode);
   /// ```
@@ -19,13 +19,13 @@ class FocusUtils {
     });
   }
 
-  /// Execute a callback after the current frame completes, with mounted check.
-  /// The callback will only execute if the State is still mounted.
+  /// 在当前帧构建完成后执行回调，并进行挂载状态检查。
+  /// 只有当 State 仍处于挂载状态时，回调才会执行。
   ///
-  /// Usage:
+  /// 用法：
   /// ```dart
   /// FocusUtils.afterBuildIfMounted(this, () {
-  ///   // do something
+  ///   // 执行某些操作
   /// });
   /// ```
   static void afterBuildIfMounted(State state, VoidCallback callback) {
@@ -36,13 +36,13 @@ class FocusUtils {
     });
   }
 
-  /// Execute a callback after the current frame completes, without mounted check.
-  /// Use this when you don't need the mounted check or are managing it yourself.
+  /// 在当前帧构建完成后执行回调，不进行挂载状态检查。
+  /// 当您不需要挂载检查或自行管理挂载状态时使用。
   ///
-  /// Usage:
+  /// 用法：
   /// ```dart
   /// FocusUtils.afterBuild(() {
-  ///   // do something
+  ///   // 执行某些操作
   /// });
   /// ```
   static void afterBuild(VoidCallback callback) {

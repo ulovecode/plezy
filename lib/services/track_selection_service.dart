@@ -6,17 +6,17 @@ import '../models/plex_user_profile.dart';
 import '../utils/app_logger.dart';
 import '../utils/language_codes.dart';
 
-/// Priority levels for track selection
+/// 轨道选择的优先级
 enum TrackSelectionPriority {
-  navigation, // Priority 1: User's manual selection from previous episode
-  plexSelected, // Priority 2: Plex's selected track
-  perMedia, // Priority 3: Per-media language preference
-  profile, // Priority 4: User profile preferences
-  defaultTrack, // Priority 5: Default or first track
-  off, // Priority 6: Subtitles off (subtitle only)
+  navigation, // 优先级 1：用户从上一集开始的手动选择
+  plexSelected, // 优先级 2：Plex 选择的轨道
+  perMedia, // 优先级 3：针对该媒体的语言偏好
+  profile, // 优先级 4：用户个人资料偏好
+  defaultTrack, // 优先级 5：默认轨道或第一个轨道
+  off, // 优先级 6：关闭字幕 (仅限字幕)
 }
 
-/// Result of track selection including the selected track and which priority was used
+/// 轨道选择结果，包含所选轨道以及使用的优先级
 class TrackSelectionResult<T> {
   final T track;
   final TrackSelectionPriority priority;
@@ -24,8 +24,7 @@ class TrackSelectionResult<T> {
   TrackSelectionResult(this.track, this.priority);
 }
 
-/// Service for selecting and applying audio and subtitle tracks based on
-/// preferences, user profiles, and per-media settings.
+/// 用于根据偏好、用户个人资料和针对媒体的设置选择并应用音频和字幕轨道的服务。
 class TrackSelectionService {
   final Player player;
   final PlexUserProfile? profileSettings;
@@ -34,7 +33,7 @@ class TrackSelectionService {
 
   TrackSelectionService({required this.player, this.profileSettings, required this.metadata, this.plexMediaInfo});
 
-  /// Build list of preferred languages from a user profile
+  /// 从用户个人资料构建首选语言列表
   List<String> _buildPreferredLanguages(PlexUserProfile profile, {required bool isAudio}) {
     final primary = isAudio ? profile.defaultAudioLanguage : profile.defaultSubtitleLanguage;
     final list = isAudio ? profile.defaultAudioLanguages : profile.defaultSubtitleLanguages;
@@ -49,7 +48,7 @@ class TrackSelectionService {
     return result;
   }
 
-  /// Find a track by preferred language with variation lookup and logging
+  /// 通过首选语言查找轨道，支持变体查找和日志记录
   T? _findTrackByPreferredLanguage<T>(
     List<T> tracks,
     String preferredLanguage,
@@ -68,17 +67,17 @@ class TrackSelectionService {
     );
   }
 
-  /// Apply a filter to tracks, falling back to original if filter produces empty result
+  /// 对轨道应用过滤器，如果过滤器产生空结果则回退到原始列表
   List<T> _applyFilterWithFallback<T>(List<T> tracks, List<T> Function(List<T>) filter, String filterDescription) {
     final filtered = filter(tracks);
     return filtered.isNotEmpty ? filtered : tracks;
   }
 
-  /// Generic track matching for audio and subtitle tracks
-  /// Returns the best matching track based on hierarchical criteria:
-  /// 1. Exact match (id + title + language)
-  /// 2. Partial match (title + language)
-  /// 3. Language-only match
+  /// 音频和字幕轨道的通用轨道匹配
+  /// 根据层级标准返回最佳匹配轨道：
+  /// 1. 完全匹配 (id + 标题 + 语言)
+  /// 2. 部分匹配 (标题 + 语言)
+  /// 3. 仅语言匹配
   T? findBestTrackMatch<T>(
     List<T> availableTracks,
     T preferred,
@@ -88,7 +87,7 @@ class TrackSelectionService {
   ) {
     if (availableTracks.isEmpty) return null;
 
-    // Filter out auto and no tracks
+    // 过滤掉 auto 和 no 轨道
     final validTracks = availableTracks.where((t) => getId(t) != 'auto' && getId(t) != 'no').toList();
     if (validTracks.isEmpty) return null;
 
@@ -96,21 +95,21 @@ class TrackSelectionService {
     final preferredTitle = getTitle(preferred);
     final preferredLanguage = getLanguage(preferred);
 
-    // Try to match: id, title, and language
+    // 尝试匹配：id、标题和语言
     for (var track in validTracks) {
       if (getId(track) == preferredId && getTitle(track) == preferredTitle && getLanguage(track) == preferredLanguage) {
         return track;
       }
     }
 
-    // Try to match: title and language
+    // 尝试匹配：标题和语言
     for (var track in validTracks) {
       if (getTitle(track) == preferredTitle && getLanguage(track) == preferredLanguage) {
         return track;
       }
     }
 
-    // Try to match: language only
+    // 尝试匹配：仅语言
     for (var track in validTracks) {
       if (getLanguage(track) == preferredLanguage) {
         return track;
@@ -135,8 +134,8 @@ class TrackSelectionService {
         availableTracks,
         preferredLanguage,
         (t) => t.language,
-        (t) => t.title ?? 'Track ${t.id}',
-        'audio track',
+        (t) => t.title ?? '轨道 ${t.id}',
+        '音频轨道',
       );
       if (match != null) return match;
     }
@@ -145,7 +144,7 @@ class TrackSelectionService {
   }
 
   SubtitleTrack? findBestSubtitleMatch(List<SubtitleTrack> availableTracks, SubtitleTrack preferred) {
-    // Handle special "no subtitles" case
+    // 处理特殊的“无字幕”情况
     if (preferred.id == 'no') {
       return SubtitleTrack.off;
     }
@@ -166,40 +165,40 @@ class TrackSelectionService {
   }) {
     if (availableTracks.isEmpty) return null;
 
-    // Mode 0: Manually selected - return OFF
+    // 模式 0：手动选择 - 返回 OFF
     if (profile.autoSelectSubtitle == 0) return SubtitleTrack.off;
 
-    // Mode 1: Shown with foreign audio
+    // 模式 1：在外语音频时显示
     if (profile.autoSelectSubtitle == 1) {
       if (selectedAudioTrack != null && profile.defaultSubtitleLanguage != null) {
         final audioLang = selectedAudioTrack.language?.toLowerCase();
         final prefLang = profile.defaultSubtitleLanguage!.toLowerCase();
         final languageVariations = LanguageCodes.getVariations(prefLang);
 
-        // If audio matches preferred language, no subtitles needed
+        // 如果音频匹配首选语言，则不需要字幕
         if (audioLang != null && languageVariations.contains(audioLang)) {
           return SubtitleTrack.off;
         }
       }
     }
 
-    // Mode 2: Always enabled (or continuing from mode 1 with foreign audio)
+    // 模式 2：始终启用 (或者从模式 1 继续，如果是外语音频)
     final preferredLanguages = _buildPreferredLanguages(profile, isAudio: false);
     if (preferredLanguages.isEmpty) return null;
 
-    // Apply filtering with fallback to original tracks if filter produces empty result
+    // 应用过滤，如果过滤产生空结果则回退到原始轨道列表
     var candidateTracks = availableTracks;
     candidateTracks = filterSubtitlesBySDH(candidateTracks, profile.defaultSubtitleAccessibility);
     candidateTracks = filterSubtitlesByForced(candidateTracks, profile.defaultSubtitleForced);
-    candidateTracks = _applyFilterWithFallback(availableTracks, (_) => candidateTracks, 'strict filters');
+    candidateTracks = _applyFilterWithFallback(availableTracks, (_) => candidateTracks, '严格过滤');
 
     for (final preferredLanguage in preferredLanguages) {
       final match = _findTrackByPreferredLanguage<SubtitleTrack>(
         candidateTracks,
         preferredLanguage,
         (t) => t.language,
-        (t) => t.title ?? 'Track ${t.id}',
-        'subtitle',
+        (t) => t.title ?? '轨道 ${t.id}',
+        '字幕',
       );
       if (match != null) return match;
     }
@@ -207,13 +206,13 @@ class TrackSelectionService {
     return null;
   }
 
-  /// Filters subtitle tracks based on SDH (Subtitles for Deaf or Hard-of-Hearing) preference
+  /// 根据 SDH (听障字幕) 偏好过滤字幕轨道
   ///
-  /// Values:
-  /// - 0: Prefer non-SDH subtitles
-  /// - 1: Prefer SDH subtitles
-  /// - 2: Only show SDH subtitles
-  /// - 3: Only show non-SDH subtitles
+  /// 值：
+  /// - 0：首选非 SDH 字幕
+  /// - 1：首选 SDH 字幕
+  /// - 2：仅显示 SDH 字幕
+  /// - 3：仅显示非 SDH 字幕
   List<SubtitleTrack> filterSubtitlesBySDH(List<SubtitleTrack> tracks, int preference) {
     if (preference == 0 || preference == 1) {
       final preferSDH = preference == 1;
@@ -227,13 +226,13 @@ class TrackSelectionService {
     return tracks;
   }
 
-  /// Filters subtitle tracks based on forced subtitle preference
+  /// 根据强制字幕偏好过滤字幕轨道
   ///
-  /// Values:
-  /// - 0: Prefer non-forced subtitles
-  /// - 1: Prefer forced subtitles
-  /// - 2: Only show forced subtitles
-  /// - 3: Only show non-forced subtitles
+  /// 值：
+  /// - 0：首选非强制字幕
+  /// - 1：首选强制字幕
+  /// - 2：仅显示强制字幕
+  /// - 3：仅显示非强制字幕
   List<SubtitleTrack> filterSubtitlesByForced(List<SubtitleTrack> tracks, int preference) {
     if (preference == 0 || preference == 1) {
       final preferForced = preference == 1;
@@ -247,27 +246,27 @@ class TrackSelectionService {
     return tracks;
   }
 
-  /// Checks if a subtitle track is SDH (Subtitles for Deaf or Hard-of-Hearing)
+  /// 检查字幕轨道是否为 SDH (听障字幕)
   ///
-  /// Since mpv may not expose this directly, we infer from the title
+  /// 由于 mpv 可能无法直接公开此信息，我们从标题中推断
   bool isSDH(SubtitleTrack track) {
     final title = track.title?.toLowerCase() ?? '';
 
-    // Look for common SDH indicators
+    // 寻找常见的 SDH 标识符
     return title.contains('sdh') ||
         title.contains('cc') ||
         title.contains('hearing impaired') ||
         title.contains('deaf');
   }
 
-  /// Checks if a subtitle track is forced
+  /// 检查字幕轨道是否为强制字幕
   bool isForced(SubtitleTrack track) {
     final title = track.title?.toLowerCase() ?? '';
     return title.contains('forced');
   }
 
-  /// Find a track matching a preferred language from a list of tracks
-  /// Returns the first track whose language matches any variation of the preferred language
+  /// 从轨道列表中查找匹配首选语言的轨道
+  /// 返回第一个其语言匹配首选语言任何变体的轨道
   T? _findTrackByLanguageVariations<T>(
     List<T> tracks,
     String preferredLanguage,
@@ -285,10 +284,10 @@ class TrackSelectionService {
     return null;
   }
 
-  /// Checks if a track language matches a preferred language
+  /// 检查轨道语言是否匹配首选语言
   ///
-  /// Handles both 2-letter (ISO 639-1) and 3-letter (ISO 639-2) codes
-  /// Also handles bibliographic variants and region codes (e.g., "en-US")
+  /// 处理 2 位 (ISO 639-1) 和 3 位 (ISO 639-2) 代码
+  /// 还处理文献变体和区域代码 (例如 "en-US")
   bool languageMatches(String? trackLanguage, String? preferredLanguage) {
     if (trackLanguage == null || preferredLanguage == null) {
       return false;
@@ -297,28 +296,28 @@ class TrackSelectionService {
     final track = trackLanguage.toLowerCase();
     final preferred = preferredLanguage.toLowerCase();
 
-    // Direct match
+    // 直接匹配
     if (track == preferred) return true;
 
-    // Extract base language codes (handle region codes like "en-US")
+    // 提取基础语言代码 (处理区域代码，如 "en-US")
     final trackBase = track.split('-').first;
     final preferredBase = preferred.split('-').first;
 
     if (trackBase == preferredBase) return true;
 
-    // Get all variations of the preferred language (e.g., "en" → ["en", "eng"])
+    // 获取首选语言的所有变体 (例如 "en" -> ["en", "eng"])
     final variations = LanguageCodes.getVariations(preferredBase);
 
-    // Check if track's base code matches any variation
+    // 检查轨道的辅助代码是否匹配任何变体
     return variations.contains(trackBase);
   }
 
-  /// Select the best audio track based on priority:
-  /// Priority 1: Preferred track from navigation
-  /// Priority 2: Plex-selected track from media info
-  /// Priority 3: Per-media language preference
-  /// Priority 4: User profile preferences
-  /// Priority 5: Default or first track
+  /// 根据优先级选择最佳音频轨道：
+  /// 优先级 1：来自导航的首选轨道
+  /// 优先级 2：来自媒体信息的 Plex 选择轨道
+  /// 优先级 3：针对该媒体的语言偏好
+  /// 优先级 4：用户个人资料偏好
+  /// 优先级 5：默认轨道或第一个轨道
   TrackSelectionResult<AudioTrack>? selectAudioTrack(
     List<AudioTrack> availableTracks,
     AudioTrack? preferredAudioTrack,
@@ -327,7 +326,7 @@ class TrackSelectionService {
 
     AudioTrack? trackToSelect;
 
-    // Priority 1: Try to match preferred track from navigation
+    // 优先级 1：尝试匹配来自导航的首选轨道
     if (preferredAudioTrack != null) {
       trackToSelect = findBestAudioMatch(availableTracks, preferredAudioTrack);
       if (trackToSelect != null) {
@@ -335,7 +334,7 @@ class TrackSelectionService {
       }
     }
 
-    // Priority 2: Check Plex-selected track from media info
+    // 优先级 2：检查来自媒体信息的 Plex 选择轨道
     if (plexMediaInfo != null) {
       final plexAudioTracks = plexMediaInfo!.audioTracks;
       final plexSelectedIndex = plexAudioTracks.indexWhere((t) => t.selected);
@@ -344,7 +343,7 @@ class TrackSelectionService {
       }
     }
 
-    // Priority 3: Try per-media language preference
+    // 优先级 3：尝试针对该媒体的语言偏好
     if (metadata.audioLanguage != null) {
       final matchedTrack = availableTracks.firstWhere(
         (track) => languageMatches(track.language, metadata.audioLanguage),
@@ -355,7 +354,7 @@ class TrackSelectionService {
       }
     }
 
-    // Priority 4: Try user profile preferences
+    // 优先级 4：尝试用户个人资料偏好
     if (profileSettings != null) {
       trackToSelect = findAudioTrackByProfile(availableTracks, profileSettings!);
       if (trackToSelect != null) {
@@ -363,18 +362,18 @@ class TrackSelectionService {
       }
     }
 
-    // Priority 5: Use default or first track
+    // 优先级 5：使用默认轨道或第一个轨道
     trackToSelect = availableTracks.firstWhere((t) => t.isDefault == true, orElse: () => availableTracks.first);
     return TrackSelectionResult(trackToSelect, TrackSelectionPriority.defaultTrack);
   }
 
-  /// Select the best subtitle track based on priority:
-  /// Priority 1: Preferred track from navigation
-  /// Priority 2: Plex-selected track from media info
-  /// Priority 3: Per-media language preference
-  /// Priority 4: User profile preferences
-  /// Priority 5: Default track
-  /// Priority 6: Off
+  /// 根据优先级选择最佳字幕轨道：
+  /// 优先级 1：来自导航的首选轨道
+  /// 优先级 2：来自媒体信息的 Plex 选择轨道
+  /// 优先级 3：针对该媒体的语言偏好
+  /// 优先级 4：用户个人资料偏好
+  /// 优先级 5：默认轨道
+  /// 优先级 6：关闭
   TrackSelectionResult<SubtitleTrack> selectSubtitleTrack(
     List<SubtitleTrack> availableTracks,
     SubtitleTrack? preferredSubtitleTrack,
@@ -382,7 +381,7 @@ class TrackSelectionService {
   ) {
     SubtitleTrack? subtitleToSelect;
 
-    // Priority 1: Try preferred track from navigation
+    // 优先级 1：尝试来自导航的首选轨道
     if (preferredSubtitleTrack != null) {
       if (preferredSubtitleTrack.id == 'no') {
         return TrackSelectionResult(SubtitleTrack.off, TrackSelectionPriority.navigation);
@@ -394,7 +393,7 @@ class TrackSelectionService {
       }
     }
 
-    // Priority 2: Check Plex-selected track from media info
+    // 优先级 2：检查来自媒体信息的 Plex 选择轨道
     if (plexMediaInfo != null && availableTracks.isNotEmpty) {
       final plexSubtitleTracks = plexMediaInfo!.subtitleTracks;
       final plexSelectedIndex = plexSubtitleTracks.indexWhere((t) => t.selected);
@@ -403,7 +402,7 @@ class TrackSelectionService {
       }
     }
 
-    // Priority 3: Try per-media language preference
+    // 优先级 3：尝试针对该媒体的语言偏好
     if (metadata.subtitleLanguage != null) {
       if (metadata.subtitleLanguage == 'none' || metadata.subtitleLanguage!.isEmpty) {
         return TrackSelectionResult(SubtitleTrack.off, TrackSelectionPriority.perMedia);
@@ -418,7 +417,7 @@ class TrackSelectionService {
       }
     }
 
-    // Priority 4: Apply user profile preferences
+    // 优先级 4：应用用户个人资料偏好
     if (profileSettings != null && availableTracks.isNotEmpty) {
       subtitleToSelect = findSubtitleTrackByProfile(
         availableTracks,
@@ -430,7 +429,7 @@ class TrackSelectionService {
       }
     }
 
-    // Priority 5: Check for default subtitle
+    // 优先级 5：检查默认字幕
     if (availableTracks.isNotEmpty) {
       final defaultTrack = availableTracks.firstWhere((t) => t.isDefault == true, orElse: () => availableTracks.first);
       if (defaultTrack.isDefault == true) {
@@ -438,11 +437,11 @@ class TrackSelectionService {
       }
     }
 
-    // Priority 6: Turn off subtitles
+    // 优先级 6：关闭字幕
     return TrackSelectionResult(SubtitleTrack.off, TrackSelectionPriority.off);
   }
 
-  /// Select and apply audio and subtitle tracks based on preferences
+  /// 根据偏好选择并应用音频和字幕轨道
   Future<void> selectAndApplyTracks({
     AudioTrack? preferredAudioTrack,
     SubtitleTrack? preferredSubtitleTrack,
@@ -450,48 +449,48 @@ class TrackSelectionService {
     Function(AudioTrack)? onAudioTrackChanged,
     Function(SubtitleTrack)? onSubtitleTrackChanged,
   }) async {
-    // Wait for tracks to be loaded
+    // 等待轨道加载完成
     int attempts = 0;
     while (player.state.tracks.audio.isEmpty && player.state.tracks.subtitle.isEmpty && attempts < 100) {
       await Future.delayed(const Duration(milliseconds: 100));
       attempts++;
     }
 
-    // Get real tracks (excluding auto and no)
+    // 获取真实轨道 (排除 auto 和 no)
     final realAudioTracks = player.state.tracks.audio.where((t) => t.id != 'auto' && t.id != 'no').toList();
     final realSubtitleTracks = player.state.tracks.subtitle.where((t) => t.id != 'auto' && t.id != 'no').toList();
 
-    // Select and apply audio track
+    // 选择并应用音频轨道
     final audioResult = selectAudioTrack(realAudioTracks, preferredAudioTrack);
     AudioTrack? selectedAudioTrack;
     if (audioResult != null) {
       selectedAudioTrack = audioResult.track;
       appLogger.d(
-        'Audio: ${selectedAudioTrack.title ?? selectedAudioTrack.language ?? "Track ${selectedAudioTrack.id}"} [${audioResult.priority.name}]',
+        '音频: ${selectedAudioTrack.title ?? selectedAudioTrack.language ?? "轨道 ${selectedAudioTrack.id}"} [${audioResult.priority.name}]',
       );
       player.selectAudioTrack(selectedAudioTrack);
 
-      // Save to Plex if this was user's navigation preference (Priority 1)
+      // 如果这是用户的导航偏好 (优先级 1)，则保存到 Plex
       if (audioResult.priority == TrackSelectionPriority.navigation && onAudioTrackChanged != null) {
         onAudioTrackChanged(selectedAudioTrack);
       }
     }
 
-    // Select and apply subtitle track
+    // 选择并应用字幕轨道
     final subtitleResult = selectSubtitleTrack(realSubtitleTracks, preferredSubtitleTrack, selectedAudioTrack);
     final selectedSubtitleTrack = subtitleResult.track;
     final subtitleName = selectedSubtitleTrack.id == 'no'
-        ? 'OFF'
-        : (selectedSubtitleTrack.title ?? selectedSubtitleTrack.language ?? 'Track ${selectedSubtitleTrack.id}');
-    appLogger.d('Subtitle: $subtitleName [${subtitleResult.priority.name}]');
+        ? '关闭'
+        : (selectedSubtitleTrack.title ?? selectedSubtitleTrack.language ?? '轨道 ${selectedSubtitleTrack.id}');
+    appLogger.d('字幕: $subtitleName [${subtitleResult.priority.name}]');
     player.selectSubtitleTrack(selectedSubtitleTrack);
 
-    // Save to Plex if this was user's navigation preference (Priority 1)
+    // 如果这是用户的导航偏好 (优先级 1)，则保存到 Plex
     if (subtitleResult.priority == TrackSelectionPriority.navigation && onSubtitleTrackChanged != null) {
       onSubtitleTrackChanged(selectedSubtitleTrack);
     }
 
-    // Set playback rate if preferred rate was provided
+    // 如果提供了首选速率，则设置播放速率
     if (preferredPlaybackRate != null) {
       player.setRate(preferredPlaybackRate);
     }

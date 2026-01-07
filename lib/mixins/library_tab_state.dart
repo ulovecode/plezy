@@ -3,13 +3,13 @@ import '../services/plex_client.dart';
 import '../models/plex_library.dart';
 import '../utils/provider_extensions.dart';
 
-/// Mixin providing common functionality for library tab screens
-/// Provides server-specific client resolution for multi-server support
+/// 为库标签页（Library Tab）屏幕提供通用功能的混入（Mixin）。
+/// 提供针对特定服务器的客户端解析，以支持多服务器。
 mixin LibraryTabStateMixin<T extends StatefulWidget> on State<T> {
-  /// The library being displayed
+  /// 正在显示的库
   PlexLibrary get library;
 
-  /// Get the correct PlexClient for this library's server
-  /// Throws an exception if no client is available
+  /// 获取此库所属服务器的正确 PlexClient
+  /// 如果没有可用的客户端，则抛出异常
   PlexClient getClientForLibrary() => context.getClientForLibrary(library);
 }

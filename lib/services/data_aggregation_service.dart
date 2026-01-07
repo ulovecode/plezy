@@ -8,24 +8,24 @@ import '../utils/app_logger.dart';
 import 'multi_server_manager.dart';
 import 'plex_auth_service.dart';
 
-/// Service for aggregating data from multiple Plex servers
+/// 用于聚合来自多个 Plex 服务器数据的服务
 class DataAggregationService {
   final MultiServerManager _serverManager;
 
-  // Cache for libraries with TTL
+  // 媒体库缓存及其生存时间 (TTL)
   Map<String, List<PlexLibrary>>? _cachedLibrariesByServer;
   DateTime? _librariesCacheTime;
   static const Duration _librariesCacheTTL = Duration(hours: 1);
 
   DataAggregationService(this._serverManager);
 
-  /// Clear the libraries cache (useful for server changes or logout)
+  /// 清除媒体库缓存 (在服务器变更或退出登录时很有用)
   void clearCache() {
     _cachedLibrariesByServer = null;
     _librariesCacheTime = null;
   }
 
-  /// Check if libraries cache is still valid
+  /// 检查媒体库缓存是否仍然有效
   bool get _isLibrariesCacheValid {
     if (_cachedLibrariesByServer == null || _librariesCacheTime == null) {
       return false;
@@ -35,70 +35,70 @@ class DataAggregationService {
     return cacheAge < _librariesCacheTTL;
   }
 
-  /// Fetch libraries from all online servers
-  /// Libraries are automatically tagged with server info by PlexClient
+  /// 从所有在线服务器获取媒体库
+  /// 媒体库会自动由 PlexClient 标记服务器信息
   Future<List<PlexLibrary>> getLibrariesFromAllServers() async {
     return _perServer<PlexLibrary>(
-      operationName: 'fetching libraries',
+      operationName: '正在获取媒体库',
       operation: (serverId, client, server) async {
         return await client.getLibraries();
       },
     );
   }
 
-  /// Fetch "On Deck" (Continue Watching) from all servers and merge by recency
-  /// Items are automatically tagged with server info by PlexClient
+  /// 从所有服务器获取 "On Deck" (继续观看) 并按时间排序
+  /// 项目会自动由 PlexClient 标记服务器信息
   Future<List<PlexMetadata>> getOnDeckFromAllServers({int? limit}) async {
     final allOnDeck = await _perServer<PlexMetadata>(
-      operationName: 'fetching on deck',
+      operationName: '正在获取继续观看项目',
       operation: (serverId, client, server) async {
         return await client.getOnDeck();
       },
     );
 
-    // Sort by most recently viewed
-    // Use lastViewedAt (when item was last viewed), falling back to updatedAt/addedAt if not available
+    // 按最近观看时间排序
+    // 优先使用 lastViewedAt (最后观看时间)，如果没有则回退到 updatedAt/addedAt
     allOnDeck.sort((a, b) {
       final aTime = a.lastViewedAt ?? a.updatedAt ?? a.addedAt ?? 0;
       final bTime = b.lastViewedAt ?? b.updatedAt ?? b.addedAt ?? 0;
-      return bTime.compareTo(aTime); // Descending (most recent first)
+      return bTime.compareTo(aTime); // 降序 (最近的排在前面)
     });
 
-    // Apply limit if specified
+    // 如果指定了限制，则应用限制
     final result = limit != null && limit < allOnDeck.length ? allOnDeck.sublist(0, limit) : allOnDeck;
 
-    appLogger.i('Fetched ${result.length} on deck items from all servers');
+    appLogger.i('已从所有服务器获取 ${result.length} 个继续观看项目');
 
     return result;
   }
 
-  /// Fetch libraries from all servers and cache them for hub fetching
-  /// This allows libraries to be fetched in parallel with other operations
+  /// 从所有服务器获取媒体库并缓存，用于后续获取推荐栏 (Hub)
+  /// 这允许媒体库获取与其他操作并行进行
   Future<Map<String, List<PlexLibrary>>> getLibrariesFromAllServersGrouped({bool forceRefresh = false}) async {
-    // Return cached libraries if still valid and not forcing refresh
+    // 如果缓存有效且不强制刷新，则返回缓存的媒体库数据
     if (!forceRefresh && _isLibrariesCacheValid) {
-      appLogger.d('Using cached libraries data');
+      appLogger.d('正在使用缓存的媒体库数据');
       return _cachedLibrariesByServer!;
     }
 
     final librariesByServer = await _perServerGrouped<PlexLibrary>(
-      operationName: 'fetching libraries',
+      operationName: '正在获取媒体库',
       operation: (serverId, client, server) async {
         return await client.getLibraries();
       },
     );
 
-    // Cache the results
+    // 缓存结果
     _cachedLibrariesByServer = librariesByServer;
     _librariesCacheTime = DateTime.now();
 
     final totalLibraries = librariesByServer.values.fold<int>(0, (sum, libs) => sum + libs.length);
-    appLogger.d('Fetched $totalLibraries libraries from ${librariesByServer.length} servers');
+    appLogger.d('已从 ${librariesByServer.length} 个服务器获取 $totalLibraries 个媒体库');
 
     return librariesByServer;
   }
 
-  /// Fetch recommendation hubs from all servers using pre-fetched libraries
+  /// 使用预先获取的媒体库，从所有服务器获取推荐栏 (Hub)
   Future<List<PlexHub>> getHubsFromAllServers({
     int? limit,
     Map<String, List<PlexLibrary>>? librariesByServer,
@@ -107,31 +107,31 @@ class DataAggregationService {
     final clients = _serverManager.onlineClients;
 
     if (clients.isEmpty) {
-      appLogger.w('No online servers available for fetching hubs');
+      appLogger.w('没有在线服务器可用于获取推荐栏');
       return [];
     }
 
-    // Use pre-fetched libraries or fetch them if not provided
+    // 使用预先获取的媒体库，如果未提供则重新获取
     final libraries = librariesByServer ?? await getLibrariesFromAllServersGrouped();
 
-    appLogger.d('Fetching hubs from ${clients.length} servers');
+    appLogger.d('正在从 ${clients.length} 个服务器获取推荐栏');
 
     final allHubs = <PlexHub>[];
 
-    // Fetch from all servers in parallel using cached libraries
+    // 并行从所有服务器获取推荐栏，使用缓存的媒体库
     final hubFutures = clients.entries.map((entry) async {
       final serverId = entry.key;
       final client = entry.value;
 
       try {
-        // Use pre-fetched libraries for this server
+        // 使用该服务器预先获取的媒体库
         final serverLibraries = libraries[serverId] ?? <PlexLibrary>[];
         if (serverLibraries.isEmpty) {
-          appLogger.w('No libraries available for server $serverId');
+          appLogger.w('服务器 $serverId 没有可用的媒体库');
           return <PlexHub>[];
         }
 
-        // Filter to only visible movie/show libraries
+        // 仅筛选可见的电影/剧集媒体库
         final visibleLibraries = serverLibraries.where((library) {
           if (library.type != 'movie' && library.type != 'show') {
             return false;
@@ -139,29 +139,29 @@ class DataAggregationService {
           if (library.hidden != null && library.hidden != 0) {
             return false;
           }
-          // Check app-level hidden libraries
+          // 检查应用层隐藏的媒体库
           if (hiddenLibraryKeys != null && hiddenLibraryKeys.contains(library.globalKey)) {
             return false;
           }
           return true;
         }).toList();
 
-        // Fetch hubs from all libraries in parallel
+        // 并行从所有媒体库获取推荐栏
         final libraryHubFutures = visibleLibraries.map((library) async {
           try {
-            // Hubs are now tagged with server info at the source
+            // 推荐栏已在源头标记了服务器信息
             final hubs = await client.getLibraryHubs(library.key);
-            appLogger.d('Fetched ${hubs.length} hubs for ${library.title} on $serverId');
+            appLogger.d('已为服务器 $serverId 上的 ${library.title} 获取 ${hubs.length} 个推荐栏');
             return hubs;
           } catch (e) {
-            appLogger.w('Failed to fetch hubs for library ${library.title}: $e');
+            appLogger.w('获取媒体库 ${library.title} 的推荐栏失败: $e');
             return <PlexHub>[];
           }
         });
 
         final libraryHubResults = await Future.wait(libraryHubFutures);
 
-        // Flatten all library hubs
+        // 展平所有媒体库的推荐栏
         final serverHubs = <PlexHub>[];
         for (final hubs in libraryHubResults) {
           serverHubs.addAll(hubs);
@@ -169,7 +169,7 @@ class DataAggregationService {
 
         return serverHubs;
       } catch (e, stackTrace) {
-        appLogger.e('Failed to fetch hubs from server $serverId', error: e, stackTrace: stackTrace);
+        appLogger.e('从服务器 $serverId 获取推荐栏失败', error: e, stackTrace: stackTrace);
         _serverManager.updateServerStatus(serverId, false);
         return <PlexHub>[];
       }
@@ -177,61 +177,61 @@ class DataAggregationService {
 
     final results = await Future.wait(hubFutures);
 
-    // Flatten results
+    // 展平所有结果
     for (final hubs in results) {
       allHubs.addAll(hubs);
     }
 
-    // Apply limit if specified
+    // 如果指定了限制，则应用限制
     final result = limit != null && limit < allHubs.length ? allHubs.sublist(0, limit) : allHubs;
 
-    appLogger.i('Fetched ${result.length} hubs from all servers');
+    appLogger.i('已从所有服务器获取 ${result.length} 个推荐栏');
 
     return result;
   }
 
-  /// Search across all online servers
-  /// Results are automatically tagged with server info by PlexClient
+  /// 跨所有在线服务器搜索
+  /// 结果会自动由 PlexClient 标记服务器信息
   Future<List<PlexMetadata>> searchAcrossServers(String query, {int? limit}) async {
     if (query.trim().isEmpty) {
       return [];
     }
 
     final allResults = await _perServer<PlexMetadata>(
-      operationName: 'searching for "$query"',
+      operationName: '正在搜索 "$query"',
       operation: (serverId, client, server) async {
         return await client.search(query);
       },
     );
 
-    // Apply limit if specified
+    // 如果指定了限制，则应用限制
     final result = limit != null && limit < allResults.length ? allResults.sublist(0, limit) : allResults;
 
-    appLogger.i('Found ${result.length} search results across all servers');
+    appLogger.i('在所有服务器上找到 ${result.length} 个搜索结果');
 
     return result;
   }
 
-  /// Get libraries for a specific server
+  /// 获取特定服务器的媒体库
   Future<List<PlexLibrary>> getLibrariesForServer(String serverId) async {
     final client = _serverManager.getClient(serverId);
 
     if (client == null) {
-      appLogger.w('No client found for server $serverId');
+      appLogger.w('未找到服务器 $serverId 的客户端');
       return [];
     }
 
     try {
-      // Libraries are automatically tagged with server info by PlexClient
+      // 媒体库会自动由 PlexClient 标记服务器信息
       return await client.getLibraries();
     } catch (e, stackTrace) {
-      appLogger.e('Failed to fetch libraries for server $serverId', error: e, stackTrace: stackTrace);
+      appLogger.e('获取服务器 $serverId 的媒体库失败', error: e, stackTrace: stackTrace);
       _serverManager.updateServerStatus(serverId, false);
       return [];
     }
   }
 
-  /// Group libraries by server
+  /// 按服务器对媒体库进行分组
   Map<String, List<PlexLibrary>> groupLibrariesByServer(List<PlexLibrary> libraries) {
     final grouped = <String, List<PlexLibrary>>{};
 
@@ -245,12 +245,12 @@ class DataAggregationService {
     return grouped;
   }
 
-  // Private helper methods
+  // 私有辅助方法
 
-  /// Base helper for per-server fan-out operations
+  /// 用于多服务器并行扇出 (fan-out) 操作的基础辅助方法
   ///
-  /// Returns raw results as (serverId, result) tuples.
-  /// Used by [_perServer] and [_perServerGrouped] for different aggregation strategies.
+  /// 返回原始结果为 (serverId, result) 元组列表。
+  /// 被 [_perServer] 和 [_perServerGrouped] 用于不同的聚合策略。
   Future<List<(String serverId, List<T> result)>> _perServerRaw<T>({
     required String operationName,
     required Future<List<T>> Function(String serverId, PlexClient client, PlexServer? server) operation,
@@ -258,11 +258,11 @@ class DataAggregationService {
     final clients = _serverManager.onlineClients;
 
     if (clients.isEmpty) {
-      appLogger.w('No online servers available for $operationName');
+      appLogger.w('没有在线服务器可用于 $operationName');
       return [];
     }
 
-    appLogger.d('$operationName from ${clients.length} servers');
+    appLogger.d('正在从 ${clients.length} 个服务器执行 $operationName');
 
     final futures = clients.entries.map((entry) async {
       final serverId = entry.key;
@@ -273,13 +273,13 @@ class DataAggregationService {
       try {
         final result = await operation(serverId, client, server);
         appLogger.d(
-          '$operationName for server $serverId completed in ${sw.elapsedMilliseconds}ms with ${result.length} items',
+          '服务器 $serverId 的 $operationName 完成，耗时 ${sw.elapsedMilliseconds}ms，获取到 ${result.length} 个项目',
         );
         return (serverId, result);
       } catch (e, stackTrace) {
-        appLogger.e('Failed $operationName from server $serverId', error: e, stackTrace: stackTrace);
+        appLogger.e('服务器 $serverId 的 $operationName 失败', error: e, stackTrace: stackTrace);
         _serverManager.updateServerStatus(serverId, false);
-        appLogger.d('$operationName for server $serverId failed after ${sw.elapsedMilliseconds}ms');
+        appLogger.d('服务器 $serverId 的 $operationName 在耗时 ${sw.elapsedMilliseconds}ms 后失败');
         return (serverId, <T>[]);
       }
     });
@@ -287,10 +287,10 @@ class DataAggregationService {
     return await Future.wait(futures);
   }
 
-  /// Higher-order helper for per-server fan-out operations
+  /// 用于多服务器并行扇出操作的高阶辅助方法
   ///
-  /// Iterates over all online clients, executes the operation for each server,
-  /// handles errors, updates server status, and flattens results into a single list.
+  /// 遍历所有在线客户端，为每个服务器执行操作，
+  /// 处理错误，更新服务器状态，并将结果展平为单个列表。
   Future<List<T>> _perServer<T>({
     required String operationName,
     required Future<List<T>> Function(String serverId, PlexClient client, PlexServer? server) operation,
@@ -299,9 +299,9 @@ class DataAggregationService {
     return [for (final (_, items) in results) ...items];
   }
 
-  /// Higher-order helper for per-server fan-out operations that groups results by server
+  /// 用于多服务器并行扇出操作的高阶辅助方法，按服务器对结果进行分组
   ///
-  /// Similar to [_perServer] but returns a Map with results grouped by serverId.
+  /// 与 [_perServer] 类似，但返回一个按 serverId 分组结果的 Map。
   Future<Map<String, List<T>>> _perServerGrouped<T>({
     required String operationName,
     required Future<List<T>> Function(String serverId, PlexClient client, PlexServer? server) operation,

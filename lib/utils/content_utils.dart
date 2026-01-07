@@ -3,7 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import '../models/plex_metadata.dart';
 
-/// Content type constants used throughout the app
+/// 应用程序中使用的内容类型常量
 class ContentTypes {
   ContentTypes._();
 
@@ -23,17 +23,17 @@ class ContentTypes {
   static const Set<String> playableTypes = {movie, episode, clip, track};
 }
 
-/// Utility class for content type checking and filtering
+/// 用于内容类型检查和过滤的工具类
 class ContentTypeHelper {
   ContentTypeHelper._();
 
-  /// Checks if the given type is music content (artist, album, or track)
+  /// 检查给定类型是否为音乐内容（艺术家、专辑或曲目）
   static bool isMusicContent(String type) => ContentTypes.musicTypes.contains(type.toLowerCase());
 
-  /// Checks if the given type is video content (movie, show, episode, or season)
+  /// 检查给定类型是否为视频内容（电影、剧集、单集或季）
   static bool isVideoContent(String type) => ContentTypes.videoTypes.contains(type.toLowerCase());
 
-  /// Checks if the given library is a music library
+  /// 检查给定库是否为音乐库
   static bool isMusicLibrary(dynamic lib) {
     if (lib == null) return false;
     try {
@@ -44,12 +44,12 @@ class ContentTypeHelper {
     }
   }
 
-  /// Filters out music content from a list of items
+  /// 从项目列表中过滤掉音乐内容
   static List<T> filterOutMusic<T>(List<T> items, String Function(T) getType) {
     return items.where((item) => !isMusicContent(getType(item))).toList();
   }
 
-  /// Returns the appropriate icon for a given library type
+  /// 返回给定库类型的相应图标
   static IconData getLibraryIcon(String type) {
     switch (type.toLowerCase()) {
       case ContentTypes.movie:
@@ -66,14 +66,14 @@ class ContentTypeHelper {
   }
 }
 
-/// Utility function to format content ratings by removing country prefixes
+/// 格式化内容分级的工具函数，通过移除国家前缀实现
 String formatContentRating(String? contentRating) {
   if (contentRating == null || contentRating.isEmpty) {
     return '';
   }
 
-  // Remove common country prefixes like "gb/", "us/", "de/", etc.
-  // The pattern matches: lowercase letters followed by a forward slash
+  // 移除常见的国家前缀，如 "gb/"、"us/"、"de/" 等。
+  // 该模式匹配：后面跟着正斜杠的两个或三个小写字母
   final regex = RegExp(r'^[a-z]{2,3}/(.+)$', caseSensitive: false);
   final match = regex.firstMatch(contentRating);
 
@@ -84,7 +84,7 @@ String formatContentRating(String? contentRating) {
   return contentRating;
 }
 
-/// Extension on PlexMetadata for type checking convenience methods
+/// PlexMetadata 的扩展，提供类型检查的便捷方法
 extension PlexMetadataType on PlexMetadata {
   String get _lowerType => type.toLowerCase();
 

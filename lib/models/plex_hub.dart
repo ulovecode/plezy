@@ -1,6 +1,6 @@
 import 'plex_metadata.dart';
 
-/// Represents a Plex hub/recommendation section (e.g., Trending Movies, Top Thrillers)
+/// 表示 Plex Hub/推荐栏目（例如：热门电影、高分惊悚片）
 class PlexHub {
   final String hubKey;
   final String title;
@@ -10,9 +10,9 @@ class PlexHub {
   final bool more;
   final List<PlexMetadata> items;
 
-  // Multi-server support fields
-  final String? serverId; // Server machine identifier
-  final String? serverName; // Server display name
+  // 多服务器支持字段
+  final String? serverId; // 服务器机器标识符
+  final String? serverName; // 服务器显示名称
 
   PlexHub({
     required this.hubKey,
@@ -29,19 +29,19 @@ class PlexHub {
   factory PlexHub.fromJson(Map<String, dynamic> json) {
     final metadataList = <PlexMetadata>[];
 
-    // Helper function to parse entries from a JSON list
+    // 用于从 JSON 列表中解析条目的辅助函数
     void parseEntries(List? entries) {
       if (entries == null) return;
       for (final item in entries) {
         try {
           metadataList.add(PlexMetadata.fromJson(item));
         } catch (e) {
-          // Skip items that fail to parse
+          // 跳过解析失败的项目
         }
       }
     }
 
-    // Hubs can contain either Metadata or Directory entries
+    // Hub 可以包含 Metadata 或 Directory 条目
     parseEntries(json['Metadata'] as List?);
     parseEntries(json['Directory'] as List?);
 

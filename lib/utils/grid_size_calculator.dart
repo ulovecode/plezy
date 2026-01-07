@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import '../services/settings_service.dart' show LibraryDensity;
 import 'layout_constants.dart';
 
-/// Utility class for calculating consistent grid sizes across the app
+/// 用于在整个应用程序中计算一致的网格尺寸的工具类
 class GridSizeCalculator {
-  /// Screen width breakpoint for tablet devices
+  /// 平板设备的屏幕宽度断点
   static const double tabletBreakpoint = ScreenBreakpoints.tablet;
 
-  /// Screen width breakpoint for desktop devices
+  /// 桌面设备的屏幕宽度断点
   static const double desktopBreakpoint = ScreenBreakpoints.desktop;
 
-  /// Calculates the maximum cross-axis extent for grid items based on screen size and density
+  /// 根据屏幕尺寸和密度计算网格项目的最大交叉轴延伸范围（max cross-axis extent）
   static double getMaxCrossAxisExtent(BuildContext context, LibraryDensity density) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth > desktopBreakpoint;
@@ -32,12 +32,12 @@ class GridSizeCalculator {
     }
   }
 
-  /// Calculates the max cross-axis extent accounting for outer padding.
+  /// 计算考虑外部边距后的最大交叉轴延伸范围。
   ///
-  /// Uses responsive strategies:
-  /// - Wide screens (>=900px): Divisor-based calculation with max item width
-  /// - Medium screens (600-899px): Fixed item count (4-6 items based on density)
-  /// - Small screens (<600px): Fixed item count (2-4 items based on density)
+  /// 使用响应式策略：
+  /// - 宽屏幕 (>=900px)：基于除数的计算，具有最大项目宽度限制
+  /// - 中等屏幕 (600-899px)：固定项目数量（根据密度为 4-6 个项目）
+  /// - 小屏幕 (<600px)：固定项目数量（根据密度为 2-4 个项目）
   static double getMaxCrossAxisExtentWithPadding(
     BuildContext context,
     LibraryDensity density,
@@ -47,7 +47,7 @@ class GridSizeCalculator {
     final availableWidth = screenWidth - horizontalPadding;
 
     if (ScreenBreakpoints.isWideTabletOrLarger(screenWidth)) {
-      // Wide screens (desktop/large tablet landscape): Responsive division
+      // 宽屏幕（桌面/大平板横屏）：响应式划分
       double divisor;
       double maxItemWidth;
 
@@ -65,7 +65,7 @@ class GridSizeCalculator {
 
       return (availableWidth / divisor).clamp(0, maxItemWidth);
     } else if (ScreenBreakpoints.isTablet(screenWidth)) {
-      // Medium screens (tablets): Fixed 4-5-6 items
+      // 中等屏幕（平板）：固定 4-5-6 个项目
       int targetItemCount = switch (density) {
         LibraryDensity.comfortable => 4,
         LibraryDensity.normal => 5,
@@ -73,7 +73,7 @@ class GridSizeCalculator {
       };
       return availableWidth / targetItemCount;
     } else {
-      // Small screens (phones): Fixed 2-3-4 items
+      // 小屏幕（手机）：固定 2-3-4 个项目
       int targetItemCount = switch (density) {
         LibraryDensity.comfortable => 2,
         LibraryDensity.normal => 3,
@@ -83,18 +83,18 @@ class GridSizeCalculator {
     }
   }
 
-  /// Returns whether the current screen is a desktop-sized screen
+  /// 返回当前屏幕是否为桌面级尺寸的屏幕
   static bool isDesktop(BuildContext context) {
     return MediaQuery.of(context).size.width > desktopBreakpoint;
   }
 
-  /// Returns whether the current screen is a tablet-sized screen
+  /// 返回当前屏幕是否为平板级尺寸的屏幕
   static bool isTablet(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     return screenWidth > tabletBreakpoint && screenWidth <= desktopBreakpoint;
   }
 
-  /// Returns whether the current screen is a mobile-sized screen
+  /// 返回当前屏幕是否为手机级尺寸的屏幕
   static bool isMobile(BuildContext context) {
     return MediaQuery.of(context).size.width <= tabletBreakpoint;
   }

@@ -1,30 +1,30 @@
 import 'package:flutter/material.dart';
 import '../theme/mono_tokens.dart';
 
-/// Focus styling constants for D-pad navigation.
+/// D-pad 导航的焦点样式常量。
 class FocusTheme {
   FocusTheme._();
 
-  /// Scale factor when an item is focused.
+  /// 元素获得焦点时的缩放比例。
   static const double focusScale = 1.02;
 
-  /// Border width for the focus indicator.
+  /// 焦点指示器的边框宽度。
   static const double focusBorderWidth = 2.5;
 
-  /// Default border radius (matches MonoTokens.radiusSm).
+  /// 默认边框半径（匹配 MonoTokens.radiusSm）。
   static const double defaultBorderRadius = 8.0;
 
-  /// Get the focus border color from the theme.
+  /// 从主题中获取焦点边框颜色。
   static Color getFocusBorderColor(BuildContext context) {
     return Theme.of(context).colorScheme.primary;
   }
 
-  /// Get the animation duration from MonoTokens.
+  /// 从 MonoTokens 获取动画持续时间。
   static Duration getAnimationDuration(BuildContext context) {
     return Theme.of(context).extension<MonoTokens>()?.fast ?? const Duration(milliseconds: 150);
   }
 
-  /// Build the focus border decoration.
+  /// 构建焦点边框装饰。
   static BoxDecoration focusDecoration(
     BuildContext context, {
     required bool isFocused,
@@ -38,8 +38,8 @@ class FocusTheme {
     );
   }
 
-  /// Build focus decoration with background color instead of border.
-  /// Useful for video controls where it should match the native hover style.
+  /// 构建带有背景颜色而非边框的焦点装饰。
+  /// 适用于需要匹配原生悬停样式的视频控件。
   static BoxDecoration focusBackgroundDecoration({required bool isFocused, double borderRadius = defaultBorderRadius}) {
     return BoxDecoration(
       borderRadius: BorderRadius.circular(borderRadius),

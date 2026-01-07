@@ -3,11 +3,9 @@ import '../services/settings_service.dart';
 import 'grid_size_calculator.dart';
 import 'layout_constants.dart';
 
-/// Builds an adaptive Sliver widget that switches between grid and list
-/// based on the current view mode setting.
+/// 构建一个自适应 Sliver 组件，根据当前的视图模式设置在网格和列表之间切换。
 ///
-/// This helper consolidates the list vs grid Sliver builders to keep
-/// padding and density logic in sync across different screens.
+/// 此辅助方法整合了列表与网格的 Sliver 构建器，以保持不同屏幕上的内边距和密度逻辑同步。
 Widget buildAdaptiveMediaSliverBuilder<T>({
   required BuildContext context,
   required List<T> items,

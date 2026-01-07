@@ -6,78 +6,78 @@ import 'dpad_navigator.dart';
 import 'focus_theme.dart';
 import 'input_mode_tracker.dart';
 
-/// A wrapper widget that makes its child focusable with D-pad navigation support.
+/// 一个包装小部件，使其子组件可获得焦点并支持 D-pad 导航。
 ///
-/// Provides:
-/// - Visual focus indicator (border + scale animation)
-/// - Keyboard/D-pad event handling (Enter/Select to activate)
-/// - Optional auto-scroll to keep focused item visible
-/// - Long-press detection for SELECT key
-/// - Navigation callbacks (UP, BACK)
+/// 提供：
+/// - 视觉焦点指示器（边框 + 缩放动画）
+/// - 键盘/D-pad 事件处理（按下 Enter/Select 激活）
+/// - 可选的自动滚动以保持焦点项可见
+/// - SELECT 键的长按检测
+/// - 导航回调（向上、返回）
 class FocusableWrapper extends StatefulWidget {
-  /// The child widget to wrap.
+  /// 要包装的子小部件。
   final Widget child;
 
-  /// Called when the item is selected (Enter/Select/GamepadA).
-  /// For short press when [enableLongPress] is true.
+  /// 当项目被选中时调用（Enter/Select/GamepadA）。
+  /// 当 [enableLongPress] 为 true 时，用于短按。
   final VoidCallback? onSelect;
 
-  /// Called when long press is triggered (hold SELECT key or context menu key).
-  /// Only triggered if [enableLongPress] is true.
+  /// 当触发长按时调用（按住 SELECT 键或上下文菜单键）。
+  /// 仅在 [enableLongPress] 为 true 时触发。
   final VoidCallback? onLongPress;
 
-  /// Called when focus changes.
+  /// 当焦点改变时调用。
   final ValueChanged<bool>? onFocusChange;
 
-  /// Called when the user presses UP and there's no focusable item above.
+  /// 当用户按下“上”且上方没有可聚焦项目时调用。
   final VoidCallback? onNavigateUp;
 
-  /// Called when the user presses BACK.
+  /// 当用户按下“返回”时调用。
   final VoidCallback? onBack;
 
-  /// Whether this widget should request focus when first built.
+  /// 此小部件在首次构建时是否应自动获取焦点。
   final bool autofocus;
 
-  /// Optional external FocusNode for programmatic focus control.
+  /// 用于程序化焦点控制的可选外部 FocusNode。
   final FocusNode? focusNode;
 
-  /// Border radius for the focus indicator.
+  /// 焦点指示器的边框半径。
   final double borderRadius;
 
-  /// Whether to scroll the widget into view when focused.
+  /// 获得焦点时是否将小部件滚动到视图中。
   final bool autoScroll;
 
-  /// Alignment for auto-scroll (0.0 = start, 0.5 = center, 1.0 = end).
+  /// 自动滚动的对齐方式（0.0 = 开始，0.5 = 居中，1.0 = 结束）。
   final double scrollAlignment;
 
-  /// Whether to use comfortable zone scrolling (only scroll if item is outside middle 60%).
-  /// If false, always scrolls to [scrollAlignment].
+  /// 是否使用舒适区滚动（仅当项目位于中间 60% 区域外时才滚动）。
+  /// 如果为 false，则始终滚动到 [scrollAlignment]。
   final bool useComfortableZone;
 
-  /// Optional semantic label for accessibility.
+  /// 用于辅助功能的可选语义标签。
   final String? semanticLabel;
 
-  /// Whether the wrapper can receive focus.
+  /// 该包装器是否可以接收焦点。
   final bool canRequestFocus;
 
-  /// Custom key event handler. Return KeyEventResult.handled to consume the event.
-  /// This is called before the default key handling.
+  /// 自定义按键事件处理器。返回 KeyEventResult.handled 以消耗事件。
+  /// 此方法在默认按键处理之前调用。
   final KeyEventResult Function(FocusNode node, KeyEvent event)? onKeyEvent;
 
-  /// Whether to enable long-press detection for SELECT key.
-  /// When enabled, holding SELECT triggers [onLongPress] after 500ms.
-  /// Short press triggers [onSelect].
+  /// 是否启用 SELECT 键的长按检测。
+  /// 启用后，按住 SELECT 500 毫秒后触发 [onLongPress]。
+  /// 短按触发 [onSelect]。
   final bool enableLongPress;
 
-  /// Duration for long-press detection.
+  /// 长按检测的持续时间。
   final Duration longPressDuration;
 
-  /// Whether to use background color instead of border for focus indicator.
-  /// Useful for video controls where outline doesn't look good.
+  /// 焦点指示器是否使用背景颜色而非边框。
+  /// 适用于边框效果不佳的视频控件。
   final bool useBackgroundFocus;
 
-  /// Whether to disable the scale animation on focus.
-  /// Useful for elements like sliders where scaling looks odd.
+  /// 是否在获得焦点时禁用缩放动画。
+  /// 适用于滑块等缩放效果奇怪的元素。
   final bool disableScale;
 
   const FocusableWrapper({

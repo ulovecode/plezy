@@ -1,18 +1,18 @@
 import 'package:drift/drift.dart';
 
-/// Key-value cache table for Plex API responses.
-/// Used for offline support - stores raw JSON responses.
+/// Plex API 响应的键值缓存表。
+/// 用于离线支持 - 存储原始 JSON 响应。
 class ApiCache extends Table {
-  /// Composite key: serverId:endpoint (e.g., "abc123:/library/metadata/12345")
+  /// 复合键：serverId:endpoint (例如 "abc123:/library/metadata/12345")
   TextColumn get cacheKey => text()();
 
-  /// JSON response data
+  /// JSON 响应数据
   TextColumn get data => text()();
 
-  /// Whether this item is pinned for offline access
+  /// 此项目是否已固定以便离线访问
   BoolColumn get pinned => boolean().withDefault(const Constant(false))();
 
-  /// Timestamp for cache invalidation (optional future use)
+  /// 用于缓存失效的时间戳 (可选的未来用途)
   DateTimeColumn get cachedAt => dateTime().withDefault(currentDateAndTime)();
 
   @override
@@ -49,46 +49,46 @@ class DownloadedMedia extends Table {
   IntColumn get retryCount => integer().withDefault(const Constant(0))();
 }
 
-/// Queue for offline watch progress and manual watch actions.
+/// 离线观看进度和手动观看操作队列。
 ///
-/// Stores watch progress updates and manual watch/unwatch actions
-/// that need to be synced to the Plex server when back online.
+/// 存储观看进度更新和手动已看/未看操作，
+/// 这些操作需要在恢复在线时同步到 Plex 服务器。
 @DataClassName('OfflineWatchProgressItem')
 class OfflineWatchProgress extends Table {
-  /// Auto-incrementing primary key
+  /// 自增主键
   IntColumn get id => integer().autoIncrement()();
 
-  /// Server ID this media belongs to
+  /// 此媒体所属的服务器 ID
   TextColumn get serverId => text()();
 
-  /// Rating key of the media item
+  /// 媒体项目的 Rating key
   TextColumn get ratingKey => text()();
 
-  /// Global key (serverId:ratingKey) for easy lookup
+  /// 用于快速查找的全局键 (serverId:ratingKey)
   TextColumn get globalKey => text()();
 
-  /// Type of action: 'progress', 'watched', 'unwatched'
+  /// 操作类型：'progress', 'watched', 'unwatched'
   TextColumn get actionType => text()();
 
-  /// Current playback position in milliseconds (for 'progress' actions)
+  /// 当前播放位置，以毫秒为单位 (用于 'progress' 操作)
   IntColumn get viewOffset => integer().nullable()();
 
-  /// Duration of the media in milliseconds (for calculating percentage)
+  /// 媒体时长，以毫秒为单位 (用于计算百分比)
   IntColumn get duration => integer().nullable()();
 
-  /// Whether this item should be marked as watched (for progress sync)
-  /// Auto-set to true when viewOffset >= 90% of duration
+  /// 是否应将此项目标记为已看 (用于进度同步)
+  /// 当 viewOffset >= duration 的 90% 时自动设置为 true
   BoolColumn get shouldMarkWatched => boolean().withDefault(const Constant(false))();
 
-  /// Timestamp when this action was recorded (milliseconds since epoch)
+  /// 记录此操作的时间戳 (自纪元以来的毫秒数)
   IntColumn get createdAt => integer()();
 
-  /// Timestamp when this action was last updated (for merging progress updates)
+  /// 上次更新此操作的时间戳 (用于合并进度更新)
   IntColumn get updatedAt => integer()();
 
-  /// Number of sync attempts (for retry logic)
+  /// 同步尝试次数 (用于重试逻辑)
   IntColumn get syncAttempts => integer().withDefault(const Constant(0))();
 
-  /// Last sync error message
+  /// 上次同步错误消息
   TextColumn get lastError => text().nullable()();
 }

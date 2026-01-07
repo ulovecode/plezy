@@ -13,7 +13,9 @@ enum LibraryDensity { compact, normal, comfortable }
 
 enum ViewMode { grid, list }
 
+/// 设置服务，继承自 BaseSharedPreferencesService，用于管理应用的所有用户偏好设置。
 class SettingsService extends BaseSharedPreferencesService {
+  // 存储键名常量
   static const String _keyThemeMode = 'theme_mode';
   static const String _keyEnableDebugLogging = 'enable_debug_logging';
   static const String _keyBufferSize = 'buffer_size';
@@ -58,247 +60,299 @@ class SettingsService extends BaseSharedPreferencesService {
 
   SettingsService._();
 
+  /// 获取 SettingsService 单例
   static Future<SettingsService> getInstance() async {
     return BaseSharedPreferencesService.initializeInstance(() => SettingsService._());
   }
 
-  /// Generic helper to get an enum value from preferences
+  /// 从偏好设置中获取枚举值的通用辅助方法
   T _getEnumValue<T extends Enum>(String key, List<T> values, T defaultValue) {
     final stored = prefs.getString(key);
     if (stored == null) return defaultValue;
     return values.firstWhere((v) => v.name == stored, orElse: () => defaultValue);
   }
 
-  // Theme Mode
+  // 主题模式管理
+  /// 设置主题模式
   Future<void> setThemeMode(ThemeMode mode) async {
     await prefs.setString(_keyThemeMode, mode.name);
   }
 
+  /// 获取主题模式
   ThemeMode getThemeMode() {
     return _getEnumValue(_keyThemeMode, ThemeMode.values, ThemeMode.system);
   }
 
-  // Debug Logging
+  // 调试日志管理
+  /// 设置是否启用调试日志
   Future<void> setEnableDebugLogging(bool enabled) async {
     await prefs.setBool(_keyEnableDebugLogging, enabled);
-    // Update logger level immediately when setting changes
+    // 设置变更时立即更新日志级别
     setLoggerLevel(enabled);
   }
 
+  /// 获取是否启用调试日志
   bool getEnableDebugLogging() {
     return prefs.getBool(_keyEnableDebugLogging) ?? false;
   }
 
-  // Buffer Size (in MB)
+  // 播放缓冲区大小（单位：MB）
+  /// 设置缓冲区大小
   Future<void> setBufferSize(int sizeInMB) async {
     await prefs.setInt(_keyBufferSize, sizeInMB);
   }
 
+  /// 获取缓冲区大小
   int getBufferSize() {
-    return prefs.getInt(_keyBufferSize) ?? 128; // Default 128MB
+    return prefs.getInt(_keyBufferSize) ?? 128; // 默认 128MB
   }
 
-  // Hardware Decoding
+  // 硬件解码管理
+  /// 设置是否启用硬件解码
   Future<void> setEnableHardwareDecoding(bool enabled) async {
     await prefs.setBool(_keyEnableHardwareDecoding, enabled);
   }
 
+  /// 获取是否启用硬件解码
   bool getEnableHardwareDecoding() {
-    return prefs.getBool(_keyEnableHardwareDecoding) ?? true; // Default enabled
+    return prefs.getBool(_keyEnableHardwareDecoding) ?? true; // 默认启用
   }
 
-  // HDR (High Dynamic Range)
+  // HDR (高动态范围) 管理
+  /// 设置是否启用 HDR
   Future<void> setEnableHDR(bool enabled) async {
     await prefs.setBool(_keyEnableHDR, enabled);
   }
 
+  /// 获取是否启用 HDR
   bool getEnableHDR() {
-    return prefs.getBool(_keyEnableHDR) ?? true; // Default enabled
+    return prefs.getBool(_keyEnableHDR) ?? true; // 默认启用
   }
 
-  // Preferred Video Codec
+  // 首选视频解码器
+  /// 设置首选视频解码器
   Future<void> setPreferredVideoCodec(String codec) async {
     await prefs.setString(_keyPreferredVideoCodec, codec);
   }
 
+  /// 获取首选视频解码器
   String getPreferredVideoCodec() {
     return prefs.getString(_keyPreferredVideoCodec) ?? 'auto';
   }
 
-  // Preferred Audio Codec
+  // 首选音频解码器
+  /// 设置首选音频解码器
   Future<void> setPreferredAudioCodec(String codec) async {
     await prefs.setString(_keyPreferredAudioCodec, codec);
   }
 
+  /// 获取首选音频解码器
   String getPreferredAudioCodec() {
     return prefs.getString(_keyPreferredAudioCodec) ?? 'auto';
   }
 
-  // Library Density
+  // 媒体库显示密度设置
+  /// 设置媒体库显示密度
   Future<void> setLibraryDensity(LibraryDensity density) async {
     await prefs.setString(_keyLibraryDensity, density.name);
   }
 
+  /// 获取媒体库显示密度
   LibraryDensity getLibraryDensity() {
     return _getEnumValue(_keyLibraryDensity, LibraryDensity.values, LibraryDensity.normal);
   }
 
-  // View Mode
+  // 视图模式管理 (网格/列表)
+  /// 设置视图模式
   Future<void> setViewMode(ViewMode mode) async {
     await prefs.setString(_keyViewMode, mode.name);
   }
 
+  /// 获取视图模式
   ViewMode getViewMode() {
     return _getEnumValue(_keyViewMode, ViewMode.values, ViewMode.grid);
   }
 
-  // Use Season Poster
+  // 季封面管理
+  /// 设置是否使用季封面 (false 则使用剧集封面)
   Future<void> setUseSeasonPoster(bool enabled) async {
     await prefs.setBool(_keyUseSeasonPoster, enabled);
   }
 
+  /// 获取是否使用季封面
   bool getUseSeasonPoster() {
-    return prefs.getBool(_keyUseSeasonPoster) ?? false; // Default: false (use series poster)
+    return prefs.getBool(_keyUseSeasonPoster) ?? false; // 默认 false
   }
 
-  // Show Hero Section
+  // 首页 Hero 区域管理
+  /// 设置是否显示首页 Hero 区域
   Future<void> setShowHeroSection(bool enabled) async {
     await prefs.setBool(_keyShowHeroSection, enabled);
   }
 
+  /// 获取是否显示首页 Hero 区域
   bool getShowHeroSection() {
-    return prefs.getBool(_keyShowHeroSection) ?? true; // Default: true (show hero section)
+    return prefs.getBool(_keyShowHeroSection) ?? true; // 默认显示
   }
 
-  // Seek Time Small (in seconds)
+  // 短距离快进/快退时间 (秒)
+  /// 设置短距离快进/快退时间
   Future<void> setSeekTimeSmall(int seconds) async {
     await prefs.setInt(_keySeekTimeSmall, seconds);
   }
 
+  /// 获取短距离快进/快退时间
   int getSeekTimeSmall() {
-    return prefs.getInt(_keySeekTimeSmall) ?? 10; // Default: 10 seconds
+    return prefs.getInt(_keySeekTimeSmall) ?? 10; // 默认 10 秒
   }
 
-  // Seek Time Large (in seconds)
+  // 长距离快进/快退时间 (秒)
+  /// 设置长距离快进/快退时间
   Future<void> setSeekTimeLarge(int seconds) async {
     await prefs.setInt(_keySeekTimeLarge, seconds);
   }
 
+  /// 获取长距离快进/快退时间
   int getSeekTimeLarge() {
-    return prefs.getInt(_keySeekTimeLarge) ?? 30; // Default: 30 seconds
+    return prefs.getInt(_keySeekTimeLarge) ?? 30; // 默认 30 秒
   }
 
-  // Sleep Timer Duration (in minutes)
+  // 睡眠定时器时长 (分钟)
+  /// 设置睡眠定时器时长
   Future<void> setSleepTimerDuration(int minutes) async {
     await prefs.setInt(_keySleepTimerDuration, minutes);
   }
 
+  /// 获取睡眠定时器时长
   int getSleepTimerDuration() {
-    return prefs.getInt(_keySleepTimerDuration) ?? 30; // Default: 30 minutes
+    return prefs.getInt(_keySleepTimerDuration) ?? 30; // 默认 30 分钟
   }
 
-  // Audio Sync Offset (in milliseconds)
+  // 音轨同步偏移 (毫秒)
+  /// 设置音轨同步偏移
   Future<void> setAudioSyncOffset(int milliseconds) async {
     await prefs.setInt(_keyAudioSyncOffset, milliseconds);
   }
 
+  /// 获取音轨同步偏移
   int getAudioSyncOffset() {
-    return prefs.getInt(_keyAudioSyncOffset) ?? 0; // Default: 0ms (no offset)
+    return prefs.getInt(_keyAudioSyncOffset) ?? 0; // 默认 0ms
   }
 
-  // Subtitle Sync Offset (in milliseconds)
+  // 字幕同步偏移 (毫秒)
+  /// 设置字幕同步偏移
   Future<void> setSubtitleSyncOffset(int milliseconds) async {
     await prefs.setInt(_keySubtitleSyncOffset, milliseconds);
   }
 
+  /// 获取字幕同步偏移
   int getSubtitleSyncOffset() {
-    return prefs.getInt(_keySubtitleSyncOffset) ?? 0; // Default: 0ms (no offset)
+    return prefs.getInt(_keySubtitleSyncOffset) ?? 0; // 默认 0ms
   }
 
-  // Volume (0.0 to 100.0)
+  // 音量管理 (0.0 到 100.0)
+  /// 设置当前音量
   Future<void> setVolume(double volume) async {
     await prefs.setDouble(_keyVolume, volume);
   }
 
+  /// 获取当前音量
   double getVolume() {
-    return prefs.getDouble(_keyVolume) ?? 100.0; // Default: full volume
+    return prefs.getDouble(_keyVolume) ?? 100.0; // 默认最大音量
   }
 
-  // Max Volume (100-300%, for volume boost)
+  // 最大音量限制 (100-300%，用于音量增益)
+  /// 设置最大音量限制
   Future<void> setMaxVolume(int percent) async {
     await prefs.setInt(_keyMaxVolume, percent.clamp(100, 300));
   }
 
+  /// 获取最大音量限制
   int getMaxVolume() {
-    return prefs.getInt(_keyMaxVolume) ?? 100; // Default: 100% (no boost)
+    return prefs.getInt(_keyMaxVolume) ?? 100; // 默认 100% (不增益)
   }
 
-  // Rotation Lock (mobile only)
+  // 屏幕旋转锁定 (仅移动端)
+  /// 设置是否锁定屏幕旋转
   Future<void> setRotationLocked(bool locked) async {
     await prefs.setBool(_keyRotationLocked, locked);
   }
 
+  /// 获取是否锁定屏幕旋转
   bool getRotationLocked() {
-    return prefs.getBool(_keyRotationLocked) ?? true; // Default: locked (landscape only)
+    return prefs.getBool(_keyRotationLocked) ?? true; // 默认锁定 (仅横屏)
   }
 
-  // Subtitle Styling Settings
+  // 字幕样式设置
 
-  // Font Size (30-80, default 55)
+  // 字幕字体大小 (30-80)
+  /// 设置字幕字体大小
   Future<void> setSubtitleFontSize(int size) async {
     await prefs.setInt(_keySubtitleFontSize, size);
   }
 
+  /// 获取字幕字体大小
   int getSubtitleFontSize() {
-    return prefs.getInt(_keySubtitleFontSize) ?? 55;
+    return prefs.getInt(_keySubtitleFontSize) ?? 55; // 默认 55
   }
 
-  // Text Color (hex format #RRGGBB, default white)
+  // 字幕文本颜色 (十六进制格式 #RRGGBB)
+  /// 设置字幕文本颜色
   Future<void> setSubtitleTextColor(String color) async {
     await prefs.setString(_keySubtitleTextColor, color);
   }
 
+  /// 获取字幕文本颜色
   String getSubtitleTextColor() {
-    return prefs.getString(_keySubtitleTextColor) ?? '#FFFFFF';
+    return prefs.getString(_keySubtitleTextColor) ?? '#FFFFFF'; // 默认白色
   }
 
-  // Border Size (0-5, default 3)
+  // 字幕边框大小 (0-5)
+  /// 设置字幕边框大小
   Future<void> setSubtitleBorderSize(int size) async {
     await prefs.setInt(_keySubtitleBorderSize, size);
   }
 
+  /// 获取字幕边框大小
   int getSubtitleBorderSize() {
-    return prefs.getInt(_keySubtitleBorderSize) ?? 3;
+    return prefs.getInt(_keySubtitleBorderSize) ?? 3; // 默认 3
   }
 
-  // Border Color (hex format #RRGGBB, default black)
+  // 字幕边框颜色 (十六进制格式 #RRGGBB)
+  /// 设置字幕边框颜色
   Future<void> setSubtitleBorderColor(String color) async {
     await prefs.setString(_keySubtitleBorderColor, color);
   }
 
+  /// 获取字幕边框颜色
   String getSubtitleBorderColor() {
-    return prefs.getString(_keySubtitleBorderColor) ?? '#000000';
+    return prefs.getString(_keySubtitleBorderColor) ?? '#000000'; // 默认黑色
   }
 
-  // Background Color (hex format #RRGGBB, default black)
+  // 字幕背景颜色 (十六进制格式 #RRGGBB)
+  /// 设置字幕背景颜色
   Future<void> setSubtitleBackgroundColor(String color) async {
     await prefs.setString(_keySubtitleBackgroundColor, color);
   }
 
+  /// 获取字幕背景颜色
   String getSubtitleBackgroundColor() {
-    return prefs.getString(_keySubtitleBackgroundColor) ?? '#000000';
+    return prefs.getString(_keySubtitleBackgroundColor) ?? '#000000'; // 默认黑色
   }
 
-  // Background Opacity (0-100, default 0 for transparent)
+  // 字幕背景透明度 (0-100)
+  /// 设置字幕背景透明度 (0 为完全透明)
   Future<void> setSubtitleBackgroundOpacity(int opacity) async {
     await prefs.setInt(_keySubtitleBackgroundOpacity, opacity);
   }
 
+  /// 获取字幕背景透明度
   int getSubtitleBackgroundOpacity() {
     return prefs.getInt(_keySubtitleBackgroundOpacity) ?? 0;
   }
 
-  // Keyboard Shortcuts (Legacy String-based)
+  // 键盘快捷键 (旧版字符串形式)
+  /// 获取默认键盘快捷键映射
   Map<String, String> getDefaultKeyboardShortcuts() {
     return {
       'play_pause': 'Space',
@@ -321,7 +375,8 @@ class SettingsService extends BaseSharedPreferencesService {
     };
   }
 
-  // HotKey Objects (New implementation)
+  // HotKey 对象 (新版实现)
+  /// 获取默认键盘热键映射 (HotKey 对象)
   Map<String, HotKey> getDefaultKeyboardHotkeys() {
     return {
       'play_pause': HotKey(key: PhysicalKeyboardKey.space),
@@ -344,11 +399,13 @@ class SettingsService extends BaseSharedPreferencesService {
     };
   }
 
+  /// 保存所有键盘快捷键 (字符串映射)
   Future<void> setKeyboardShortcuts(Map<String, String> shortcuts) async {
     final jsonString = json.encode(shortcuts);
     await prefs.setString(_keyKeyboardShortcuts, jsonString);
   }
 
+  /// 获取所有键盘快捷键 (字符串映射)
   Map<String, String> getKeyboardShortcuts() {
     final jsonString = prefs.getString(_keyKeyboardShortcuts);
     if (jsonString == null) return getDefaultKeyboardShortcuts();
@@ -358,28 +415,32 @@ class SettingsService extends BaseSharedPreferencesService {
 
     final shortcuts = decoded.map((key, value) => MapEntry(key, value.toString()));
 
-    // Merge with defaults to ensure all keys exist
+    // 与默认值合并以确保所有键都存在
     final defaults = getDefaultKeyboardShortcuts();
     defaults.addAll(shortcuts);
     return defaults;
   }
 
+  /// 设置单个键盘快捷键
   Future<void> setKeyboardShortcut(String action, String key) async {
     final shortcuts = getKeyboardShortcuts();
     shortcuts[action] = key;
     await setKeyboardShortcuts(shortcuts);
   }
 
+  /// 获取单个操作的键盘快捷键
   String getKeyboardShortcut(String action) {
     final shortcuts = getKeyboardShortcuts();
     return shortcuts[action] ?? '';
   }
 
+  /// 重置所有键盘快捷键为默认值
   Future<void> resetKeyboardShortcuts() async {
     await setKeyboardShortcuts(getDefaultKeyboardShortcuts());
   }
 
-  // HotKey Objects Methods
+  // HotKey 对象管理方法
+  /// 保存所有 HotKey 映射
   Future<void> setKeyboardHotkeys(Map<String, HotKey> hotkeys) async {
     final Map<String, Map<String, dynamic>> serializedHotkeys = {};
     for (final entry in hotkeys.entries) {
@@ -389,6 +450,7 @@ class SettingsService extends BaseSharedPreferencesService {
     await prefs.setString(_keyKeyboardHotkeys, jsonString);
   }
 
+  /// 获取所有 HotKey 映射
   Future<Map<String, HotKey>> getKeyboardHotkeys() async {
     final jsonString = prefs.getString(_keyKeyboardHotkeys);
     if (jsonString == null) {
@@ -406,13 +468,13 @@ class SettingsService extends BaseSharedPreferencesService {
         }
       }
 
-      // Merge with defaults to ensure all keys exist, but keep saved hotkeys priority
+      // 与默认值合并以确保所有键都存在，但优先保留已保存的热键
       final defaults = getDefaultKeyboardHotkeys();
       final result = <String, HotKey>{};
 
-      // Start with defaults
+      // 从默认值开始
       result.addAll(defaults);
-      // Override with saved hotkeys (this preserves user customizations)
+      // 覆盖为保存的热键 (这会保留用户的自定义设置)
       result.addAll(hotkeys);
 
       return result;
@@ -421,41 +483,48 @@ class SettingsService extends BaseSharedPreferencesService {
     }
   }
 
+  /// 设置单个 HotKey
   Future<void> setKeyboardHotkey(String action, HotKey hotKey) async {
     final hotkeys = await getKeyboardHotkeys();
     hotkeys[action] = hotKey;
     await setKeyboardHotkeys(hotkeys);
   }
 
+  /// 获取单个操作的 HotKey
   Future<HotKey?> getKeyboardHotkey(String action) async {
     final hotkeys = await getKeyboardHotkeys();
     return hotkeys[action];
   }
 
+  /// 重置所有 HotKey 为默认值
   Future<void> resetKeyboardHotkeys() async {
     await setKeyboardHotkeys(getDefaultKeyboardHotkeys());
   }
 
-  // Video Player Navigation (use arrow keys to navigate video player controls)
+  // 视频播放器导航 (使用方向键导航播放器控件)
+  /// 设置是否启用视频播放器导航
   Future<void> setVideoPlayerNavigationEnabled(bool enabled) async {
     await prefs.setBool(_keyVideoPlayerNavigationEnabled, enabled);
   }
 
+  /// 获取是否启用视频播放器导航
   bool getVideoPlayerNavigationEnabled() {
-    // Default: enabled on Android TV, disabled elsewhere
+    // 默认：Android TV 上启用，其他地方禁用
     return prefs.getBool(_keyVideoPlayerNavigationEnabled) ?? TvDetectionService.isTVSync();
   }
 
-  // Performance Overlay (show debug stats on video player)
+  // 性能叠加层 (在视频播放器上显示调试统计信息)
+  /// 设置是否显示性能叠加层
   Future<void> setShowPerformanceOverlay(bool enabled) async {
     await prefs.setBool(_keyShowPerformanceOverlay, enabled);
   }
 
+  /// 获取是否显示性能叠加层
   bool getShowPerformanceOverlay() {
-    return prefs.getBool(_keyShowPerformanceOverlay) ?? false; // Default: disabled
+    return prefs.getBool(_keyShowPerformanceOverlay) ?? false; // 默认禁用
   }
 
-  // Helper methods for HotKey serialization
+  // HotKey 序列化辅助方法
   static const _modifierMap = <String, HotKeyModifier>{
     'alt': HotKeyModifier.alt,
     'control': HotKeyModifier.control,
@@ -465,13 +534,15 @@ class SettingsService extends BaseSharedPreferencesService {
     'fn': HotKeyModifier.fn,
   };
 
+  /// 将 HotKey 序列化为 Map
   Map<String, dynamic> _serializeHotKey(HotKey hotKey) {
-    // Use USB HID code for reliable serialization across debug/release modes
+    // 使用 USB HID 码进行可靠的序列化，支持调试/发布模式
     final physicalKey = hotKey.key as PhysicalKeyboardKey;
     final usbHidCode = physicalKey.usbHidUsage.toRadixString(16).padLeft(8, '0');
     return {'key': usbHidCode, 'modifiers': hotKey.modifiers?.map((m) => m.name).toList() ?? []};
   }
 
+  /// 将 Map 反序列化为 HotKey
   HotKey? _deserializeHotKey(Map<String, dynamic> data) {
     try {
       final keyString = data['key'] as String;
@@ -483,20 +554,20 @@ class SettingsService extends BaseSharedPreferencesService {
           .cast<HotKeyModifier>()
           .toList();
 
-      // Try direct USB HID lookup first (new format), fall back to string parsing (backwards compat)
+      // 首先尝试通过 USB HID 查找 (新格式)，失败则回退到字符串解析 (向后兼容)
       final key = _usbHidKeyMap[keyString] ?? _findKeyByString(keyString);
       if (key != null) {
         return HotKey(key: key, modifiers: modifiers.isNotEmpty ? modifiers : null);
       }
     } catch (e) {
-      // Ignore deserialization errors
+      // 忽略反序列化错误
     }
     return null;
   }
 
-  // Unified map for USB HID codes to PhysicalKeyboardKey
+  // 用于 USB HID 码与 PhysicalKeyboardKey 的统一映射表
   static const _usbHidKeyMap = <String, PhysicalKeyboardKey>{
-    // Special keys
+    // 特殊键
     '0007002c': PhysicalKeyboardKey.space,
     '0007002a': PhysicalKeyboardKey.backspace,
     '0007004c': PhysicalKeyboardKey.delete,
@@ -504,20 +575,20 @@ class SettingsService extends BaseSharedPreferencesService {
     '00070029': PhysicalKeyboardKey.escape,
     '0007002b': PhysicalKeyboardKey.tab,
     '00070039': PhysicalKeyboardKey.capsLock,
-    // Arrow keys
+    // 方向键
     '00070050': PhysicalKeyboardKey.arrowLeft,
     '00070052': PhysicalKeyboardKey.arrowUp,
     '0007004f': PhysicalKeyboardKey.arrowRight,
     '00070051': PhysicalKeyboardKey.arrowDown,
-    // Navigation keys
+    // 导航键
     '0007004a': PhysicalKeyboardKey.home,
     '0007004d': PhysicalKeyboardKey.end,
     '0007004b': PhysicalKeyboardKey.pageUp,
     '0007004e': PhysicalKeyboardKey.pageDown,
-    // Symbol keys
+    // 符号键
     '0007002d': PhysicalKeyboardKey.equal,
     '0007002e': PhysicalKeyboardKey.minus,
-    // Function keys
+    // 功能键
     '0007003a': PhysicalKeyboardKey.f1,
     '0007003b': PhysicalKeyboardKey.f2,
     '0007003c': PhysicalKeyboardKey.f3,
@@ -530,7 +601,7 @@ class SettingsService extends BaseSharedPreferencesService {
     '00070043': PhysicalKeyboardKey.f10,
     '00070044': PhysicalKeyboardKey.f11,
     '00070045': PhysicalKeyboardKey.f12,
-    // Number keys
+    // 数字键
     '00070027': PhysicalKeyboardKey.digit0,
     '0007001e': PhysicalKeyboardKey.digit1,
     '0007001f': PhysicalKeyboardKey.digit2,
@@ -541,7 +612,7 @@ class SettingsService extends BaseSharedPreferencesService {
     '00070024': PhysicalKeyboardKey.digit7,
     '00070025': PhysicalKeyboardKey.digit8,
     '00070026': PhysicalKeyboardKey.digit9,
-    // Letter keys
+    // 字母键
     '00070004': PhysicalKeyboardKey.keyA,
     '00070005': PhysicalKeyboardKey.keyB,
     '00070006': PhysicalKeyboardKey.keyC,
@@ -570,7 +641,7 @@ class SettingsService extends BaseSharedPreferencesService {
     '0007001d': PhysicalKeyboardKey.keyZ,
   };
 
-  // Map for pattern-based key name matching (lowercase keys for case-insensitive matching)
+  // 用于模式匹配的按键名称映射 (小写以支持不区分大小写匹配)
   static const _keyNameMap = <String, PhysicalKeyboardKey>{
     'space': PhysicalKeyboardKey.space,
     'backspace': PhysicalKeyboardKey.backspace,
@@ -591,7 +662,7 @@ class SettingsService extends BaseSharedPreferencesService {
     'minus': PhysicalKeyboardKey.minus,
   };
 
-  // Function keys map
+  // 功能键映射
   static const _functionKeyMap = <String, PhysicalKeyboardKey>{
     'f1': PhysicalKeyboardKey.f1,
     'f2': PhysicalKeyboardKey.f2,
@@ -607,7 +678,7 @@ class SettingsService extends BaseSharedPreferencesService {
     'f12': PhysicalKeyboardKey.f12,
   };
 
-  // Digit keys map
+  // 数字键映射
   static const _digitKeyMap = <String, PhysicalKeyboardKey>{
     'digit0': PhysicalKeyboardKey.digit0,
     'digit1': PhysicalKeyboardKey.digit1,
@@ -621,7 +692,7 @@ class SettingsService extends BaseSharedPreferencesService {
     'digit9': PhysicalKeyboardKey.digit9,
   };
 
-  // Letter keys map
+  // 字母键映射
   static const _letterKeyMap = <String, PhysicalKeyboardKey>{
     'keya': PhysicalKeyboardKey.keyA,
     'keyb': PhysicalKeyboardKey.keyB,
@@ -651,12 +722,12 @@ class SettingsService extends BaseSharedPreferencesService {
     'keyz': PhysicalKeyboardKey.keyZ,
   };
 
-  // Helper method to find PhysicalKeyboardKey by string representation
+  /// 通过字符串表示查找 PhysicalKeyboardKey 的辅助方法
   PhysicalKeyboardKey? _findKeyByString(String keyString) {
     final normalized = keyString.toLowerCase();
 
-    // Try extracting USB HID code from toString() output
-    // Format: PhysicalKeyboardKey#ec9ed(usbHidUsage: "0x0007002c", debugName: "Space")
+    // 尝试从 toString() 输出中提取 USB HID 码
+    // 格式: PhysicalKeyboardKey#ec9ed(usbHidUsage: "0x0007002c", debugName: "Space")
     final usbHidMatch = RegExp(r'usbhidusage: "0x([0-9a-f]+)"').firstMatch(normalized);
     if (usbHidMatch != null) {
       final usbHidCode = usbHidMatch.group(1)!;
@@ -664,28 +735,28 @@ class SettingsService extends BaseSharedPreferencesService {
       if (key != null) return key;
     }
 
-    // Try direct name matches
+    // 尝试直接名称匹配
     for (final entry in _keyNameMap.entries) {
       if (normalized.contains(entry.key)) {
         return entry.value;
       }
     }
 
-    // Try function keys (check longer patterns first to avoid f1 matching f10)
+    // 尝试功能键 (首先检查较长的模式以避免 f1 匹配 f10)
     for (final entry in _functionKeyMap.entries) {
       if (normalized.contains(entry.key)) {
         return entry.value;
       }
     }
 
-    // Try digit keys
+    // 尝试数字键
     for (final entry in _digitKeyMap.entries) {
       if (normalized.contains(entry.key)) {
         return entry.value;
       }
     }
 
-    // Try letter keys
+    // 尝试字母键
     for (final entry in _letterKeyMap.entries) {
       if (normalized.contains(entry.key)) {
         return entry.value;
@@ -695,10 +766,10 @@ class SettingsService extends BaseSharedPreferencesService {
     return null;
   }
 
-  // Media Version Preferences
-  /// Save media version preference for a series
-  /// [seriesRatingKey] is the grandparentRatingKey for TV series, or ratingKey for movies
-  /// [mediaIndex] is the index of the selected media version
+  // 媒体版本偏好设置
+  /// 保存剧集/电影的媒体版本选择偏好
+  /// [seriesRatingKey] 对于电视剧是 grandparentRatingKey，对于电影是 ratingKey
+  /// [mediaIndex] 所选媒体版本的索引
   Future<void> setMediaVersionPreference(String seriesRatingKey, int mediaIndex) async {
     final preferences = _getMediaVersionPreferences();
     preferences[seriesRatingKey] = mediaIndex;
@@ -707,14 +778,14 @@ class SettingsService extends BaseSharedPreferencesService {
     await prefs.setString(_keyMediaVersionPreferences, jsonString);
   }
 
-  /// Get saved media version preference for a series
-  /// Returns null if no preference is saved
+  /// 获取保存的剧集/电影媒体版本偏好
+  /// 如果未保存则返回 null
   int? getMediaVersionPreference(String seriesRatingKey) {
     final preferences = _getMediaVersionPreferences();
     return preferences[seriesRatingKey];
   }
 
-  /// Clear media version preference for a series
+  /// 清除特定剧集/电影的媒体版本偏好
   Future<void> clearMediaVersionPreference(String seriesRatingKey) async {
     final preferences = _getMediaVersionPreferences();
     preferences.remove(seriesRatingKey);
@@ -723,7 +794,7 @@ class SettingsService extends BaseSharedPreferencesService {
     await prefs.setString(_keyMediaVersionPreferences, jsonString);
   }
 
-  /// Get all media version preferences
+  /// 获取所有媒体版本偏好设置
   Map<String, int> _getMediaVersionPreferences() {
     final jsonString = prefs.getString(_keyMediaVersionPreferences);
     if (jsonString == null) return {};
@@ -732,7 +803,7 @@ class SettingsService extends BaseSharedPreferencesService {
     return decoded.map((key, value) => MapEntry(key, value as int));
   }
 
-  /// Helper to decode JSON string to Map with error handling
+  /// 带有错误处理的 JSON 字符串解码辅助方法
   Map<String, dynamic> _decodeJsonStringToMap(String jsonString) {
     try {
       return json.decode(jsonString) as Map<String, dynamic>;
@@ -741,57 +812,67 @@ class SettingsService extends BaseSharedPreferencesService {
     }
   }
 
-  // App Locale
+  // 应用语言设置
+  /// 设置应用语言
   Future<void> setAppLocale(AppLocale locale) async {
     await prefs.setString(_keyAppLocale, locale.languageCode);
   }
 
+  /// 获取应用语言
   AppLocale getAppLocale() {
     final localeString = prefs.getString(_keyAppLocale);
-    if (localeString == null) return AppLocale.en; // Default to English
+    if (localeString == null) return AppLocale.en; // 默认英语
 
     return AppLocale.values.firstWhere((locale) => locale.languageCode == localeString, orElse: () => AppLocale.en);
   }
 
-  // Track Selection Settings
+  // 轨道选择设置
 
-  /// Remember Track Selections - Save per-media audio/subtitle language preferences
+  /// 记住轨道选择 - 是否保存每个媒体的音频/字幕语言偏好
   Future<void> setRememberTrackSelections(bool value) async {
     await prefs.setBool(_keyRememberTrackSelections, value);
   }
 
+  /// 获取是否记住轨道选择
   bool getRememberTrackSelections() {
     return prefs.getBool(_keyRememberTrackSelections) ?? true;
   }
 
-  // Auto Skip Intro
+  // 自动跳过片头 (Intro)
+  /// 设置是否自动跳过片头
   Future<void> setAutoSkipIntro(bool value) async {
     await prefs.setBool(_keyAutoSkipIntro, value);
   }
 
+  /// 获取是否自动跳过片头
   bool getAutoSkipIntro() {
-    return prefs.getBool(_keyAutoSkipIntro) ?? true; // Default: enabled
+    return prefs.getBool(_keyAutoSkipIntro) ?? true; // 默认启用
   }
 
-  // Auto Skip Credits
+  // 自动跳过片尾 (Credits)
+  /// 设置是否自动跳过片尾
   Future<void> setAutoSkipCredits(bool value) async {
     await prefs.setBool(_keyAutoSkipCredits, value);
   }
 
+  /// 获取是否自动跳过片尾
   bool getAutoSkipCredits() {
-    return prefs.getBool(_keyAutoSkipCredits) ?? true; // Default: enabled
+    return prefs.getBool(_keyAutoSkipCredits) ?? true; // 默认启用
   }
 
-  // Auto Skip Delay (in seconds)
+  // 自动跳过延迟时间 (秒)
+  /// 设置自动跳过前的延迟时间
   Future<void> setAutoSkipDelay(int seconds) async {
     await prefs.setInt(_keyAutoSkipDelay, seconds);
   }
 
+  /// 获取自动跳过前的延迟时间
   int getAutoSkipDelay() {
-    return prefs.getInt(_keyAutoSkipDelay) ?? 5; // Default: 5 seconds
+    return prefs.getInt(_keyAutoSkipDelay) ?? 5; // 默认 5 秒
   }
 
-  // Custom Download Path
+  // 自定义下载路径管理
+  /// 设置自定义下载路径
   Future<void> setCustomDownloadPath(String? path, {String type = 'file'}) async {
     if (path == null) {
       await prefs.remove(_keyCustomDownloadPath);
@@ -802,30 +883,35 @@ class SettingsService extends BaseSharedPreferencesService {
     }
   }
 
+  /// 获取自定义下载路径
   String? getCustomDownloadPath() {
     return prefs.getString(_keyCustomDownloadPath);
   }
 
+  /// 获取下载路径类型
   String getCustomDownloadPathType() {
     return prefs.getString(_keyCustomDownloadPathType) ?? 'file';
   }
 
+  /// 是否已设置自定义下载路径
   bool hasCustomDownloadPath() {
     return prefs.containsKey(_keyCustomDownloadPath);
   }
 
-  // Download on WiFi Only
+  // 仅在 WiFi 下下载设置
+  /// 设置是否仅在 WiFi 环境下下载
   Future<void> setDownloadOnWifiOnly(bool value) async {
     await prefs.setBool(_keyDownloadOnWifiOnly, value);
   }
 
+  /// 获取是否仅在 WiFi 环境下下载
   bool getDownloadOnWifiOnly() {
     return prefs.getBool(_keyDownloadOnWifiOnly) ?? false;
   }
 
-  // MPV Config Entries
+  // MPV 配置项管理
 
-  /// Get all MPV config entries
+  /// 获取所有 MPV 配置项
   List<MpvConfigEntry> getMpvConfigEntries() {
     final jsonString = prefs.getString(_keyMpvConfigEntries);
     if (jsonString == null) return [];
@@ -838,21 +924,21 @@ class SettingsService extends BaseSharedPreferencesService {
     }
   }
 
-  /// Save all MPV config entries
+  /// 保存所有 MPV 配置项
   Future<void> setMpvConfigEntries(List<MpvConfigEntry> entries) async {
     final jsonString = json.encode(entries.map((e) => e.toJson()).toList());
     await prefs.setString(_keyMpvConfigEntries, jsonString);
   }
 
-  /// Get only enabled MPV config entries (for player initialization)
+  /// 获取已启用的 MPV 配置项 (用于播放器初始化)
   Map<String, String> getEnabledMpvConfigEntries() {
     final entries = getMpvConfigEntries();
     return Map.fromEntries(entries.where((e) => e.isEnabled).map((e) => MapEntry(e.key, e.value)));
   }
 
-  // MPV Presets
+  // MPV 预设管理
 
-  /// Get all saved presets
+  /// 获取所有已保存的 MPV 预设
   List<MpvPreset> getMpvPresets() {
     final jsonString = prefs.getString(_keyMpvConfigPresets);
     if (jsonString == null) return [];
@@ -865,11 +951,11 @@ class SettingsService extends BaseSharedPreferencesService {
     }
   }
 
-  /// Save a new preset (overwrites existing with same name)
+  /// 保存新预设 (覆盖同名预设)
   Future<void> saveMpvPreset(String name, List<MpvConfigEntry> entries) async {
     final presets = getMpvPresets();
 
-    // Remove existing preset with same name
+    // 移除同名预设
     presets.removeWhere((p) => p.name == name);
 
     presets.add(MpvPreset(name: name, entries: entries, createdAt: DateTime.now()));
@@ -878,7 +964,7 @@ class SettingsService extends BaseSharedPreferencesService {
     await prefs.setString(_keyMpvConfigPresets, jsonString);
   }
 
-  /// Delete a preset by name
+  /// 按名称删除预设
   Future<void> deleteMpvPreset(String name) async {
     final presets = getMpvPresets();
     presets.removeWhere((p) => p.name == name);
@@ -887,24 +973,27 @@ class SettingsService extends BaseSharedPreferencesService {
     await prefs.setString(_keyMpvConfigPresets, jsonString);
   }
 
-  /// Load a preset (replaces current entries)
+  /// 加载预设 (替换当前配置项)
   Future<void> loadMpvPreset(String name) async {
     final presets = getMpvPresets();
-    final preset = presets.firstWhere((p) => p.name == name, orElse: () => throw Exception('Preset not found: $name'));
+    final preset = presets.firstWhere((p) => p.name == name, orElse: () => throw Exception('预设未找到: $name'));
 
     await setMpvConfigEntries(preset.entries);
   }
 
-  // Discord Rich Presence
+  // Discord Rich Presence (Discord 状态显示)
+  /// 设置是否启用 Discord RPC
   Future<void> setEnableDiscordRPC(bool enabled) async {
     await prefs.setBool(_keyEnableDiscordRPC, enabled);
   }
 
+  /// 获取是否启用 Discord RPC
   bool getEnableDiscordRPC() {
-    return prefs.getBool(_keyEnableDiscordRPC) ?? false; // Default disabled
+    return prefs.getBool(_keyEnableDiscordRPC) ?? false; // 默认禁用
   }
 
-  // Reset all settings to defaults
+  // 重置所有设置为默认值
+  /// 将应用所有设置恢复为默认状态
   Future<void> resetAllSettings() async {
     await Future.wait([
       prefs.remove(_keyThemeMode),
@@ -947,16 +1036,18 @@ class SettingsService extends BaseSharedPreferencesService {
     ]);
   }
 
-  // Clear cache (for storage cleanup)
+  // 清除缓存 (用于存储清理)
+  /// 清除缓存数据
   Future<void> clearCache() async {
-    // This would be expanded to clear various cache directories
-    // For now, we'll just clear any cache-related preferences
+    // 这里将来会扩展为清理各种缓存目录
+    // 目前仅清除任何与缓存相关的偏好设置
     await Future.wait([
-      // Add cache clearing logic here
+      // 在此处添加缓存清理逻辑
     ]);
   }
 
-  // Get all settings as a map for debugging/export
+  // 获取所有设置为 Map 格式 (用于调试或导出)
+  /// 获取应用当前所有设置的快照
   Future<Map<String, dynamic>> getAllSettings() async {
     final hotkeys = await getKeyboardHotkeys();
     return {

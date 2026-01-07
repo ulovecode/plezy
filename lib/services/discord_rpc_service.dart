@@ -10,7 +10,7 @@ import '../utils/app_logger.dart';
 import 'plex_client.dart';
 import 'settings_service.dart';
 
-/// Cached Litterbox URL with expiry timestamp
+/// 缓存的 Litterbox URL 及其过期时间
 class _CachedUrl {
   final String url;
   final DateTime expiresAt;
@@ -20,15 +20,15 @@ class _CachedUrl {
   bool get isExpired => DateTime.now().isAfter(expiresAt);
 }
 
-/// Service that manages Discord Rich Presence integration.
+/// 管理 Discord Rich Presence (RPC) 集成的服务。
 ///
-/// Desktop only (Windows, macOS, Linux). Shows "Watching" activity
-/// when video is playing. Gracefully handles Discord not running.
+/// 仅限桌面端 (Windows, macOS, Linux)。在视频播放时显示“正在观看”活动。
+/// 能够优雅地处理 Discord 未运行的情况。
 class DiscordRPCService {
   static const String _applicationId = '1453773470306402439';
   static const String _litterboxUrl = 'https://litterbox.catbox.moe/resources/internals/api.php';
 
-  /// Cache of Plex thumbnail paths to Litterbox URLs with expiry (1 hour)
+  /// Plex 缩略图路径到 Litterbox URL 的缓存，过期时间为 1 小时
   static final Map<String, _CachedUrl> _litterboxCache = {};
 
   static DiscordRPCService? _instance;
@@ -55,7 +55,7 @@ class DiscordRPCService {
 
   DiscordRPCService._();
 
-  /// Check if Discord RPC is available on this platform
+  /// 检查当前平台是否支持 Discord RPC
   static bool get isAvailable {
     if (!Platform.isMacOS && !Platform.isWindows && !Platform.isLinux) {
       return false;
@@ -63,10 +63,10 @@ class DiscordRPCService {
     return DiscordRPC.isAvailable;
   }
 
-  /// Initialize the service. Call once at app startup (main.dart).
+  /// 初始化服务。在应用启动时调用一次 (main.dart)。
   Future<void> initialize() async {
     if (!isAvailable) {
-      appLogger.d('Discord RPC not available on this platform');
+      appLogger.d('当前平台不支持 Discord RPC');
       return;
     }
 
@@ -81,7 +81,7 @@ class DiscordRPCService {
     }
   }
 
-  /// Enable or disable Discord RPC
+  /// 启用或禁用 Discord RPC
   Future<void> setEnabled(bool enabled) async {
     if (_isEnabled == enabled) return;
 
@@ -89,7 +89,7 @@ class DiscordRPCService {
 
     if (enabled) {
       await _connect();
-      // Restore presence if we have active playback
+      // 如果当前正在播放，恢复状态显示
       if (_currentMetadata != null) {
         await _updatePresence();
       }
@@ -98,7 +98,7 @@ class DiscordRPCService {
     }
   }
 
-  /// Start showing presence for media playback
+  /// 开始显示媒体播放状态
   Future<void> startPlayback(PlexMetadata metadata, PlexClient client) async {
     _currentMetadata = metadata;
     _currentClient = client;
@@ -110,22 +110,22 @@ class DiscordRPCService {
     _cachedThumbnailUrl = null;
 
     if (_isEnabled && _isConnected) {
-      // Upload thumbnail in background, don't block playback
+      // 在后台上传缩略图，不阻塞播放
       _uploadThumbnailAndUpdatePresence();
     }
   }
 
-  /// Update current playback position (for progress bar)
+  /// 更新当前播放位置 (用于进度条)
   void updatePosition(Duration position) {
     final previousPosition = _currentPosition;
     _currentPosition = position;
 
-    // Update presence if position jumped significantly (seek detected)
+    // 如果位置发生显著跳变 (检测到跳转/拖动)，更新状态显示
     if (_isEnabled && _isConnected && _playbackStartTime != null && previousPosition != null) {
       final drift = (position - previousPosition).abs();
-      // If position changed by more than 5 seconds, likely a seek
+      // 如果位置变化超过 5 秒，可能发生了跳转
       if (drift > const Duration(seconds: 5)) {
-        // Throttle updates to max once per second
+        // 限制更新频率，最高每秒一次
         final now = DateTime.now();
         if (_lastPresenceUpdate == null || now.difference(_lastPresenceUpdate!) > const Duration(seconds: 1)) {
           _lastPresenceUpdate = now;
@@ -135,11 +135,11 @@ class DiscordRPCService {
     }
   }
 
-  /// Resume playback (restore timestamp)
+  /// 恢复播放 (恢复时间戳)
   Future<void> resumePlayback() async {
     if (_currentMetadata == null) return;
 
-    // Reset start time for elapsed time display
+    // 重置开始时间以显示已播放时间
     _playbackStartTime = DateTime.now();
 
     if (_isEnabled && _isConnected) {
@@ -147,9 +147,9 @@ class DiscordRPCService {
     }
   }
 
-  /// Pause - clear timestamp but keep showing what's playing
+  /// 暂停播放 - 清除时间戳但保留显示内容
   Future<void> pausePlayback() async {
-    // Clear start time so Discord stops counting
+    // 清除开始时间，以便 Discord 停止计时
     _playbackStartTime = null;
 
     if (_isEnabled && _isConnected) {
@@ -157,7 +157,7 @@ class DiscordRPCService {
     }
   }
 
-  /// Stop showing presence when playback ends
+  /// 播放结束时停止显示状态
   Future<void> stopPlayback() async {
     _currentMetadata = null;
     _currentClient = null;
@@ -169,22 +169,22 @@ class DiscordRPCService {
     }
   }
 
-  /// Clear the presence
+  /// 清除状态显示
   Future<void> clearPresence() async {
     try {
       _rpc?.clearPresence();
     } catch (e) {
-      appLogger.d('Failed to clear Discord presence', error: e);
+      appLogger.d('清除 Discord 状态失败', error: e);
     }
   }
 
-  /// Dispose the service (call on app shutdown)
+  /// 释放服务 (应用关闭时调用)
   Future<void> dispose() async {
     _reconnectTimer?.cancel();
     await _disconnect();
   }
 
-  // Private methods
+  // 私有方法
 
   Future<void> _connect() async {
     if (_rpc != null) return;
@@ -194,12 +194,12 @@ class DiscordRPCService {
 
       _readySubscription = _rpc!.onReady.listen((_) async {
         _isConnected = true;
-        appLogger.i('Discord RPC connected');
+        appLogger.i('Discord RPC 已连接');
 
-        // Small delay to let Discord stabilize after connection
+        // 连接后稍作延迟以待 Discord 稳定
         await Future.delayed(const Duration(milliseconds: 200));
 
-        // Update presence if we have active playback
+        // 如果当前正在播放，上传缩略图并更新状态
         if (_currentMetadata != null) {
           await _uploadThumbnailAndUpdatePresence();
         }
@@ -207,18 +207,18 @@ class DiscordRPCService {
 
       _disconnectedSubscription = _rpc!.onDisconnected.listen((_) {
         _isConnected = false;
-        appLogger.i('Discord RPC disconnected');
+        appLogger.i('Discord RPC 已断开');
         _scheduleReconnect();
       });
 
       _errorSubscription = _rpc!.onError.listen((error) {
-        appLogger.w('Discord RPC error: $error');
+        appLogger.w('Discord RPC 错误: $error');
       });
 
       await _rpc!.initialize(_applicationId);
     } catch (e) {
-      appLogger.w('Failed to initialize Discord RPC', error: e);
-      // Clean up on failure so reconnect attempts can work
+      appLogger.w('初始化 Discord RPC 失败', error: e);
+      // 失败时清理以便重试
       await _readySubscription?.cancel();
       await _disconnectedSubscription?.cancel();
       await _errorSubscription?.cancel();
@@ -247,7 +247,7 @@ class DiscordRPCService {
     try {
       _rpc?.dispose();
     } catch (e) {
-      appLogger.d('Error disposing Discord RPC', error: e);
+      appLogger.d('释放 Discord RPC 错误', error: e);
     }
     _rpc = null;
   }
@@ -264,7 +264,7 @@ class DiscordRPCService {
   }
 
   Future<void> _uploadThumbnailAndUpdatePresence() async {
-    // Try to upload thumbnail, but don't block on failure
+    // 尝试上传缩略图，失败时不阻塞
     if (_cachedThumbnailUrl == null && _currentMetadata != null && _currentClient != null) {
       _cachedThumbnailUrl = await _uploadThumbnail(_currentMetadata!, _currentClient!);
     }
@@ -273,22 +273,22 @@ class DiscordRPCService {
 
   Future<String?> _uploadThumbnail(PlexMetadata metadata, PlexClient client) async {
     try {
-      // Get the thumbnail path (prefer show poster for episodes)
+      // 获取缩略图路径 (剧集优先使用剧集海报)
       final thumbPath = metadata.grandparentThumb ?? metadata.thumb;
       if (thumbPath == null || thumbPath.isEmpty) return null;
 
-      // Check cache first (with expiry check)
+      // 首先检查缓存 (包含过期检查)
       final cached = _litterboxCache[thumbPath];
       if (cached != null && !cached.isExpired) {
-        appLogger.d('Using cached Litterbox URL for: $thumbPath');
+        appLogger.d('正在使用缓存的 Litterbox URL: $thumbPath');
         return cached.url;
       }
 
-      // Get the full URL with auth token
+      // 获取包含认证令牌的完整 URL
       final imageUrl = client.getThumbnailUrl(thumbPath);
       if (imageUrl.isEmpty) return null;
 
-      // Fetch image data
+      // 获取图片数据
       final dio = Dio();
       final imageResponse = await dio.get<List<int>>(
         imageUrl,
@@ -298,7 +298,7 @@ class DiscordRPCService {
       final imageBytes = imageResponse.data;
       if (imageBytes == null || imageBytes.isEmpty) return null;
 
-      // Upload to Litterbox
+      // 上传至 Litterbox
       final formData = FormData.fromMap({
         'reqtype': 'fileupload',
         'time': '1h',
@@ -313,13 +313,13 @@ class DiscordRPCService {
 
       final uploadedUrl = uploadResponse.data?.trim();
       if (uploadedUrl != null && uploadedUrl.startsWith('http')) {
-        // Cache the URL with 1 hour expiry (matching Litterbox)
+        // 缓存 URL，过期时间 1 小时 (与 Litterbox 一致)
         _litterboxCache[thumbPath] = _CachedUrl(uploadedUrl, DateTime.now().add(const Duration(hours: 1)));
-        appLogger.d('Uploaded and cached thumbnail: $uploadedUrl');
+        appLogger.d('已上传并缓存缩略图: $uploadedUrl');
         return uploadedUrl;
       }
     } catch (e) {
-      appLogger.d('Failed to upload thumbnail to Litterbox', error: e);
+      appLogger.d('上传缩略图至 Litterbox 失败', error: e);
     }
     return null;
   }
@@ -345,34 +345,34 @@ class DiscordRPCService {
         ),
       );
     } catch (e) {
-      appLogger.d('Failed to update Discord presence', error: e);
+      appLogger.d('更新 Discord 状态失败', error: e);
     }
   }
 
-  /// Build timestamps for Discord progress bar
+  /// 为 Discord 进度条构建时间戳
   DiscordTimestamps? _buildTimestamps() {
-    // When paused, don't show timestamps (progress bar would be inaccurate)
+    // 暂停时不显示时间戳 (进度条会不准确)
     if (_playbackStartTime == null) return null;
 
-    // If we have duration, show progress bar
+    // 如果有持续时间，显示进度条
     if (_mediaDuration != null) {
       final now = DateTime.now();
       final position = _currentPosition ?? Duration.zero;
 
-      // Calculate when playback "started" (now minus current position)
+      // 计算播放“开始”时间 (当前时间减去已播放位置)
       final effectiveStart = now.subtract(position);
 
-      // Calculate when playback will "end" (start + total duration)
+      // 计算播放将要“结束”的时间 (开始时间加总时长)
       final effectiveEnd = effectiveStart.add(_mediaDuration!);
 
       return DiscordTimestamps.range(effectiveStart, effectiveEnd);
     }
 
-    // Fallback: just show elapsed time
+    // 回退方案：仅显示已播放时间
     return DiscordTimestamps.started(_playbackStartTime!);
   }
 
-  /// Build the main "details" line (first line of presence)
+  /// 构建主详情行 (状态的第一行)
   String _buildDetails(PlexMetadata metadata) {
     switch (metadata.mediaType) {
       case PlexMediaType.movie:
@@ -380,7 +380,7 @@ class DiscordRPCService {
         return metadata.title + year;
 
       case PlexMediaType.episode:
-        // Show: "Show Name" or just episode title if no show name
+        // 显示：剧集名称，如果没有剧集名称则仅显示剧集标题
         return metadata.grandparentTitle ?? metadata.title;
 
       default:
@@ -388,11 +388,11 @@ class DiscordRPCService {
     }
   }
 
-  /// Build the "state" line (second line of presence)
+  /// 构建状态行 (状态的第二行)
   String? _buildState(PlexMetadata metadata) {
     switch (metadata.mediaType) {
       case PlexMediaType.episode:
-        // Format: "S1 E5 - Episode Title"
+        // 格式："S1 E5 - 剧集标题"
         final season = metadata.parentIndex;
         final episode = metadata.index;
         if (season != null && episode != null) {

@@ -1,14 +1,13 @@
-/// Utility class for codec-related operations.
+/// 编解码器相关操作的工具类。
 ///
-/// Provides centralized codec name mappings, file extension lookups,
-/// and display name formatting.
+/// 提供中心化的编解码器名称映射、文件扩展名查询以及显示名称格式化。
 class CodecUtils {
   CodecUtils._();
 
-  /// Maps Plex subtitle codec names to file extensions.
+  /// 将 Plex 字幕编解码器名称映射到文件扩展名。
   ///
-  /// Returns the appropriate file extension for a given subtitle codec.
-  /// Defaults to 'srt' for unknown or null codecs.
+  /// 为给定的字幕编解码器返回相应的文件扩展名。
+  /// 对于未知或 null 的编解码器，默认返回 'srt'。
   static String getSubtitleExtension(String? codec) {
     if (codec == null) return 'srt';
 
@@ -36,9 +35,9 @@ class CodecUtils {
     }
   }
 
-  /// Formats a subtitle codec name to a user-friendly display format.
+  /// 将字幕编解码器名称格式化为用户友好的显示格式。
   ///
-  /// Converts internal codec names like 'SUBRIP' to friendly names like 'SRT'.
+  /// 将内部编解码器名称（如 'SUBRIP'）转换为友好名称（如 'SRT'）。
   static String formatSubtitleCodec(String codec) {
     final upper = codec.toUpperCase();
     return switch (upper) {
@@ -51,9 +50,9 @@ class CodecUtils {
     };
   }
 
-  /// Formats a video codec name to a user-friendly display format.
+  /// 将视频编解码器名称格式化为用户友好的显示格式。
   ///
-  /// Converts internal codec names like 'hevc' to friendly names like 'HEVC'.
+  /// 将内部编解码器名称（如 'hevc'）转换为友好名称（如 'HEVC'）。
   static String formatVideoCodec(String codec) {
     final lower = codec.toLowerCase();
     return switch (lower) {
@@ -69,7 +68,7 @@ class CodecUtils {
     };
   }
 
-  /// Formats an audio codec name to a user-friendly display format.
+  /// 将音频编解码器名称格式化为用户友好的显示格式。
   static String formatAudioCodec(String codec) {
     final lower = codec.toLowerCase();
     return switch (lower) {

@@ -3,14 +3,14 @@ import '../models/plex_metadata.dart';
 import '../models/play_queue_response.dart';
 import '../services/plex_client.dart';
 
-/// Playback mode types
+/// 播放模式类型
 ///
-/// All playback now uses Plex play queues.
+/// 目前所有播放都使用 Plex 播放队列。
 enum PlaybackMode {
-  playQueue, // Play queue-based playback (sequential, shuffle, playlists, collections)
+  playQueue, // 基于播放队列的播放 (顺序、随机、播放列表、合集)
 }
 
-/// Result of trying to locate the current queue index.
+/// 尝试定位当前队列索引的结果。
 class _IndexLookupResult {
   final int? index;
   final bool attemptedLoad;
@@ -19,60 +19,60 @@ class _IndexLookupResult {
   const _IndexLookupResult({this.index, this.attemptedLoad = false, this.loadFailed = false});
 }
 
-/// Manages playback state using Plex's play queue API.
-/// This provider is session-only and does not persist across app restarts.
+/// 使用 Plex 的播放队列 API 管理播放状态。
+/// 此 Provider 仅限会话，不会在应用重启后持久化。
 class PlaybackStateProvider with ChangeNotifier {
-  // Play queue state
+  // 播放队列状态
   int? _playQueueId;
   int _playQueueTotalCount = 0;
   bool _playQueueShuffled = false;
   int? _currentPlayQueueItemID;
 
-  // Windowed items (loaded around current position)
+  // 窗口化项目 (在当前位置周围加载)
   List<PlexMetadata> _loadedItems = [];
-  final int _windowSize = 50; // Number of items to keep in memory
+  final int _windowSize = 50; // 内存中保留的项目数
 
-  // Legacy state for backward compatibility
-  String? _contextKey; // The show/season/playlist ratingKey for this session
+  // 用于向后兼容的旧状态
+  String? _contextKey; // 此会话的剧集/季/播放列表 ratingKey
   PlaybackMode? _playbackMode;
 
-  // Client reference for loading more items
+  // 用于加载更多项目的客户端引用
   PlexClient? _client;
 
-  /// Current playback mode (null if no queue active)
+  /// 当前播放模式 (如果没有活动队列则为 null)
   PlaybackMode? get playbackMode => _playbackMode;
 
-  /// Whether shuffle mode is currently active
+  /// 随机模式当前是否处于活动状态
   bool get isShuffleActive => _playQueueShuffled;
 
-  /// Whether playlist/collection mode is currently active
+  /// 播放列表/合集模式当前是否处于活动状态
   bool get isPlaylistActive => _playbackMode == PlaybackMode.playQueue;
 
-  /// Whether any queue-based playback is active
+  /// 是否存在任何基于队列的活动播放
   bool get isQueueActive => _playQueueId != null && _playbackMode == PlaybackMode.playQueue;
 
-  /// The context key (show/season/playlist ratingKey) for the current session
+  /// 当前会话的上下文键 (剧集/季/播放列表 ratingKey)
   String? get shuffleContextKey => _contextKey;
 
-  /// Current play queue ID
+  /// 当前播放队列 ID
   int? get playQueueId => _playQueueId;
 
-  /// Total number of items in the play queue
+  /// 播放队列中的项目总数
   int get queueLength => _playQueueTotalCount;
 
-  /// Gets the current position in the queue (1-indexed)
+  /// 获取在队列中的当前位置 (从 1 开始)
   int get currentPosition {
     if (_currentPlayQueueItemID == null || _loadedItems.isEmpty) return 0;
     final index = _loadedItems.indexWhere((item) => item.playQueueItemID == _currentPlayQueueItemID);
     return index != -1 ? index + 1 : 0;
   }
 
-  /// Set the client reference for loading more items
+  /// 设置用于加载更多项目的客户端引用
   void setClient(PlexClient client) {
     _client = client;
   }
 
-  /// Update the current play queue item when playing a new item
+  /// 播放新项目时更新当前播放队列项目
   void setCurrentItem(PlexMetadata metadata) {
     if (_playbackMode == PlaybackMode.playQueue && metadata.playQueueItemID != null) {
       _currentPlayQueueItemID = metadata.playQueueItemID;
@@ -80,8 +80,8 @@ class PlaybackStateProvider with ChangeNotifier {
     }
   }
 
-  /// Initialize playback from a play queue
-  /// Call this after creating a play queue via the API
+  /// 从播放队列初始化播放
+  /// 在通过 API 创建播放队列后调用此方法
   Future<void> setPlaybackFromPlayQueue(
     PlayQueueResponse playQueue,
     String? contextKey, {
@@ -89,12 +89,12 @@ class PlaybackStateProvider with ChangeNotifier {
     String? serverName,
   }) async {
     _playQueueId = playQueue.playQueueID;
-    // Use size or items length as fallback if totalCount is null
+    // 如果 totalCount 为 null，则使用 size 或 items 长度作为备选
     _playQueueTotalCount = playQueue.playQueueTotalCount ?? playQueue.size ?? (playQueue.items?.length ?? 0);
     _playQueueShuffled = playQueue.playQueueShuffled;
     _currentPlayQueueItemID = playQueue.playQueueSelectedItemID;
 
-    // Items are already tagged with server info by PlexClient
+    // 项目已由 PlexClient 标记了服务器信息
     _loadedItems = playQueue.items ?? [];
 
     _contextKey = contextKey;
@@ -102,17 +102,17 @@ class PlaybackStateProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Load more items from the play queue if needed
-  /// Returns true if more items were loaded
+  /// 如果需要，从播放队列加载更多项目
+  /// 如果加载了更多项目，则返回 true
   Future<bool> _ensureItemsLoaded(int targetPlayQueueItemID) async {
     if (_client == null || _playQueueId == null) return false;
 
-    // Check if the target item is already loaded
+    // 检查目标项目是否已加载
     final hasItem = _loadedItems.any((item) => item.playQueueItemID == targetPlayQueueItemID);
 
     if (hasItem) return true;
 
-    // Load a window around the target item
+    // 在目标项目周围加载一个窗口
     try {
       final response = await _client!.getPlayQueue(
         _playQueueId!,
@@ -121,16 +121,16 @@ class PlaybackStateProvider with ChangeNotifier {
       );
 
       if (response != null && response.items != null) {
-        // Items are already tagged with server info by PlexClient
+        // 项目已由 PlexClient 标记了服务器信息
         _loadedItems = response.items!;
-        // Use size or items length as fallback if totalCount is null
+        // 如果 totalCount 为 null，则使用 size 或 items 长度作为备选
         _playQueueTotalCount = response.playQueueTotalCount ?? response.size ?? response.items!.length;
         _playQueueShuffled = response.playQueueShuffled;
         notifyListeners();
         return true;
       }
     } catch (e) {
-      // Failed to load items
+      // 加载项目失败
       return false;
     }
 
@@ -166,12 +166,12 @@ class PlaybackStateProvider with ChangeNotifier {
     return _IndexLookupResult(index: currentIndex, attemptedLoad: true);
   }
 
-  /// Gets the next item in the playback queue.
-  /// Returns null if queue is exhausted or current item is not in queue.
-  /// [loopQueue] - If true, restart from beginning when queue is exhausted
+  /// 获取播放队列中的下一个项目。
+  /// 如果队列耗尽或当前项目不在队列中，则返回 null。
+  /// [loopQueue] - 如果为 true，则在队列耗尽时从头开始
   Future<PlexMetadata?> getNextEpisode(String currentItemKey, {bool loopQueue = false}) async {
     if (_playbackMode != PlaybackMode.playQueue) {
-      // For sequential mode, let the video player handle next episode
+      // 对于顺序模式，让视频播放器处理下一集
       return null;
     }
 
@@ -184,40 +184,40 @@ class PlaybackStateProvider with ChangeNotifier {
     }
     final currentIndex = indexResult.index!;
 
-    // Check if there's a next item in the loaded window
+    // 检查已加载窗口中是否存在下一个项目
     if (currentIndex + 1 < _loadedItems.length) {
       final nextItem = _loadedItems[currentIndex + 1];
-      // Don't update _currentPlayQueueItemID here - let setCurrentItem do it when playback starts
+      // 此处不更新 _currentPlayQueueItemID - 让 setCurrentItem 在播放开始时处理
       return nextItem;
     }
 
-    // Check if we're at the end of the entire queue
+    // 检查我们是否处于整个队列的末尾
     if (currentIndex + 1 >= _playQueueTotalCount) {
       if (loopQueue && _playQueueTotalCount > 0) {
-        // Loop back to beginning - load first item
+        // 循环回到开头 - 加载第一个项目
         if (_client != null && _playQueueId != null) {
           final response = await _client!.getPlayQueue(_playQueueId!);
           if (response != null && response.items != null && response.items!.isNotEmpty) {
-            // Items are already tagged with server info by PlexClient
+            // 项目已由 PlexClient 标记了服务器信息
             _loadedItems = response.items!;
             final firstItem = _loadedItems.first;
-            // Don't update _currentPlayQueueItemID here - let setCurrentItem do it when playback starts
+            // 此处不更新 _currentPlayQueueItemID - 让 setCurrentItem 在播放开始时处理
             return firstItem;
           }
         }
       }
-      // At end of queue - return null but keep queue active so user can still go back
+      // 在队列末尾 - 返回 null 但保持队列活动，以便用户仍可以返回
       return null;
     }
 
-    // Need to load next window
+    // 需要加载下一个窗口
     if (_client != null && _playQueueId != null) {
-      // Load next window centered on the item after current
+      // 加载以当前项目之后的项目为中心的下一个窗口
       final nextItemID = _loadedItems.last.playQueueItemID;
       if (nextItemID != null) {
         final loaded = await _ensureItemsLoaded(nextItemID + 1);
         if (loaded) {
-          // Try again with newly loaded items
+          // 使用新加载的项目再次尝试
           return getNextEpisode(currentItemKey, loopQueue: loopQueue);
         }
       }
@@ -226,30 +226,30 @@ class PlaybackStateProvider with ChangeNotifier {
     return null;
   }
 
-  /// Gets the previous item in the playback queue.
-  /// Returns null if at the beginning of the queue or current item is not in queue.
+  /// 获取播放队列中的上一个项目。
+  /// 如果处于队列开头或当前项目不在队列中，则返回 null。
   Future<PlexMetadata?> getPreviousEpisode(String currentItemKey) async {
     if (_playbackMode != PlaybackMode.playQueue) {
-      // For sequential mode, let the video player handle previous episode
+      // 对于顺序模式，让视频播放器处理前一集
       return null;
     }
 
     final currentIndex = (await _getCurrentIndex()).index;
     if (currentIndex == null) return null;
 
-    // Check if there's a previous item in the loaded window
+    // 检查已加载窗口中是否存在上一个项目
     if (currentIndex > 0) {
       final prevItem = _loadedItems[currentIndex - 1];
-      // Don't update _currentPlayQueueItemID here - let setCurrentItem do it when playback starts
+      // 此处不更新 _currentPlayQueueItemID - 让 setCurrentItem 在播放开始时处理
       return prevItem;
     }
 
-    // Check if we're at the beginning of the entire queue
+    // 检查我们是否处于整个队列的开头
     if (currentIndex == 0) {
       return null;
     }
 
-    // Need to load previous window
+    // 需要加载上一个窗口
     if (_client != null && _playQueueId != null) {
       final prevItemID = _loadedItems.first.playQueueItemID;
       if (prevItemID != null && prevItemID > 0) {
@@ -263,7 +263,7 @@ class PlaybackStateProvider with ChangeNotifier {
     return null;
   }
 
-  /// Clears the playback queue and exits queue mode
+  /// 清除播放队列并退出队列模式
   void clearShuffle() {
     _playQueueId = null;
     _playQueueTotalCount = 0;

@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 
-/// Mixin that provides focus management for library tabs.
-/// Handles the lifecycle of a focus node for the first item and provides
-/// a method to request focus on that item.
+/// 为库标签页（Library Tabs）提供焦点管理的混入（Mixin）。
+/// 处理第一个项目的焦点节点生命周期，并提供一个在该项目上请求焦点的方法。
 mixin LibraryTabFocusMixin<T extends StatefulWidget> on State<T> {
-  /// Focus node for the first item (for programmatic focus)
+  /// 第一个项目的焦点节点（用于程序化聚焦）
   late final FocusNode firstItemFocusNode;
 
-  /// Debug label for the focus node
+  /// 焦点节点的调试标签
   String get focusNodeDebugLabel;
 
-  /// Number of items in the list/grid
+  /// 列表/网格中的项目数量
   int get itemCount;
 
   @override
@@ -25,7 +24,7 @@ mixin LibraryTabFocusMixin<T extends StatefulWidget> on State<T> {
     super.dispose();
   }
 
-  /// Focus the first item in the grid/list (for tab activation)
+  /// 聚焦网格/列表中的第一个项目（用于标签页激活时）
   void focusFirstItem() {
     if (itemCount > 0) {
       firstItemFocusNode.requestFocus();

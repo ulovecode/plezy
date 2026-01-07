@@ -1,28 +1,28 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Base class for services that use SharedPreferences singleton pattern.
+/// 使用 SharedPreferences 单例模式的服务基类。
 ///
-/// This class handles the boilerplate for singleton initialization and
-/// SharedPreferences lifecycle management. Subclasses should:
-/// 1. Create a private named constructor (e.g., SettingsService._())
-/// 2. Implement their own getInstance() method that calls BaseSharedPreferencesService.initializeInstance()
-/// 3. Optionally override onInit() for post-initialization setup
+/// 该类处理单例初始化和 SharedPreferences 生命周期管理的样板代码。
+/// 子类应当：
+/// 1. 创建一个私有的命名构造函数（例如：SettingsService._()）
+/// 2. 实现自己的 getInstance() 方法，并调用 BaseSharedPreferencesService.initializeInstance()
+/// 3. 可选地重写 onInit() 以进行初始化后的设置
 abstract class BaseSharedPreferencesService {
   static final Map<Type, BaseSharedPreferencesService> _instances = {};
   late SharedPreferences _prefs;
 
-  /// Protected constructor for subclasses
+  /// 供子类使用的受保护构造函数
   BaseSharedPreferencesService();
 
-  /// Access to SharedPreferences instance
+  /// 访问 SharedPreferences 实例
   SharedPreferences get prefs => _prefs;
 
-  /// Initialize the SharedPreferences instance
+  /// 初始化 SharedPreferences 实例
   ///
-  /// This method handles:
-  /// - Singleton instance management
-  /// - SharedPreferences initialization
-  /// - Calling onInit() hook for subclass-specific setup
+  /// 该方法处理：
+  /// - 单例实例管理
+  /// - SharedPreferences 初始化
+  /// - 调用 onInit() 钩子进行子类特定的设置
   static Future<T> initializeInstance<T extends BaseSharedPreferencesService>(T Function() constructor) async {
     if (_instances[T] == null) {
       final instance = constructor();
@@ -33,11 +33,11 @@ abstract class BaseSharedPreferencesService {
     return _instances[T] as T;
   }
 
-  /// Hook for subclass-specific initialization after SharedPreferences is ready.
+  /// SharedPreferences 准备就绪后，用于子类特定初始化的钩子。
   ///
-  /// Override this method to perform any setup that requires access to
-  /// SharedPreferences (e.g., registering values with other services).
+  /// 重写此方法以执行任何需要访问 SharedPreferences 的设置
+  /// （例如：向其他服务注册值）。
   Future<void> onInit() async {
-    // Default implementation does nothing
+    // 默认实现不执行任何操作
   }
 }

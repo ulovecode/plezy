@@ -8,7 +8,7 @@ import '../providers/playback_state_provider.dart';
 import '../utils/app_logger.dart';
 import '../utils/video_player_navigation.dart';
 
-/// Result of loading adjacent episodes
+/// 加载相邻剧集的结果
 class AdjacentEpisodes {
   final PlexMetadata? next;
   final PlexMetadata? previous;
@@ -19,21 +19,21 @@ class AdjacentEpisodes {
   bool get hasPrevious => previous != null;
 }
 
-/// Manages episode navigation for TV show playback.
+/// 管理电视剧播放的剧集导航。
 ///
-/// Handles:
-/// - Loading next/previous episodes from play queues
-/// - Navigating between episodes while preserving track selections
-/// - Supporting both sequential and shuffle playback modes
+/// 处理：
+/// - 从播放队列加载下一集/前一集
+/// - 在剧集之间导航，同时保留轨道选择
+/// - 支持顺序和随机播放模式
 ///
-/// All episode navigation uses Plex play queues for consistent behavior.
+/// 所有剧集导航都使用 Plex 播放队列以获得一致的行为。
 class EpisodeNavigationService {
-  /// Load the next and previous episodes for the current episode
+  /// 加载当前剧集的下一集和前一集
   ///
-  /// Returns null for episodes if:
-  /// - Not applicable (e.g., movie content)
-  /// - Next episode doesn't exist (end of season/series)
-  /// - Previous episode doesn't exist (first episode)
+  /// 如果出现以下情况，剧集返回 null：
+  /// - 不适用 (例如电影内容)
+  /// - 下一集不存在 (季末/剧终)
+  /// - 前一集不存在 (第一集)
   Future<AdjacentEpisodes> loadAdjacentEpisodes({
     required BuildContext context,
     required PlexClient client,
@@ -42,31 +42,30 @@ class EpisodeNavigationService {
     try {
       final playbackState = context.read<PlaybackStateProvider>();
 
-      // All episode navigation now uses play queues (sequential, shuffle, playlists)
-      // If no queue is active, navigation is not available
+      // 所有剧集导航现在都使用播放队列 (顺序、随机、播放列表)
+      // 如果没有活动的队列，导航将不可用
       if (!playbackState.isQueueActive) {
         return AdjacentEpisodes();
       }
 
-      // Use the play queue for next/previous navigation
+      // 使用播放队列进行下一集/前一集导航
       final next = await playbackState.getNextEpisode(metadata.ratingKey, loopQueue: false);
       final previous = await playbackState.getPreviousEpisode(metadata.ratingKey);
 
-      final mode = playbackState.isShuffleActive ? 'Shuffle' : 'Sequential';
-      appLogger.d('$mode mode - Next: ${next?.title}, Previous: ${previous?.title}');
+      final mode = playbackState.isShuffleActive ? '随机' : '顺序';
+      appLogger.d('$mode 模式 - 下一集: ${next?.title}, 上一集: ${previous?.title}');
 
       return AdjacentEpisodes(next: next, previous: previous);
     } catch (e) {
-      // Non-critical: Failed to load next/previous episode metadata
-      appLogger.d('Could not load adjacent episodes', error: e);
+      // 非关键错误：加载下一集/前一集元数据失败
+      appLogger.d('无法加载相邻剧集', error: e);
       return AdjacentEpisodes();
     }
   }
 
-  /// Navigate to the next or previous episode
+  /// 导航到下一集或前一集
   ///
-  /// Preserves the current audio track, subtitle track, and playback rate
-  /// selections when transitioning between episodes.
+  /// 在剧集转换时保留当前的音频轨道、字幕轨道和播放速度。
   Future<void> navigateToEpisode({
     required BuildContext context,
     required PlexMetadata episode,
@@ -75,7 +74,7 @@ class EpisodeNavigationService {
   }) async {
     if (!context.mounted) return;
 
-    // Capture current player state before navigation
+    // 在导航前捕获当前的播放器状态
     AudioTrack? currentAudioTrack;
     SubtitleTrack? currentSubtitleTrack;
     double? currentPlaybackRate;
@@ -86,11 +85,11 @@ class EpisodeNavigationService {
       currentPlaybackRate = player.state.rate;
 
       appLogger.d(
-        'Navigating to episode with preserved settings - Audio: ${currentAudioTrack?.id}, Subtitle: ${currentSubtitleTrack?.id}, Rate: ${currentPlaybackRate}x',
+        '正在导航到剧集，保留设置 - 音频: ${currentAudioTrack?.id}, 字幕: ${currentSubtitleTrack?.id}, 速度: ${currentPlaybackRate}x',
       );
     }
 
-    // Navigate to the new episode
+    // 导航到新剧集
     if (context.mounted) {
       navigateToVideoPlayer(
         context,

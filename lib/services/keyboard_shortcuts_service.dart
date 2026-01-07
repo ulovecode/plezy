@@ -7,14 +7,15 @@ import '../mpv/mpv.dart';
 import 'settings_service.dart';
 import '../utils/player_utils.dart';
 
+/// 键盘快捷键服务类，管理播放器的快捷键映射和处理。
 class KeyboardShortcutsService {
   static KeyboardShortcutsService? _instance;
   late SettingsService _settingsService;
-  Map<String, String> _shortcuts = {}; // Legacy string shortcuts for backward compatibility
-  Map<String, HotKey> _hotkeys = {}; // New HotKey objects
-  int _seekTimeSmall = 10; // Default, loaded from settings
-  int _seekTimeLarge = 30; // Default, loaded from settings
-  int _maxVolume = 100; // Default, loaded from settings (100-300%)
+  Map<String, String> _shortcuts = {}; // 用于向后兼容的旧版字符串快捷键
+  Map<String, HotKey> _hotkeys = {}; // 新版 HotKey 对象
+  int _seekTimeSmall = 10; // 默认值，从设置中加载
+  int _seekTimeLarge = 30; // 默认值，从设置中加载
+  int _maxVolume = 100; // 默认值，从设置中加载 (100-300%)
 
   KeyboardShortcutsService._();
 
@@ -26,17 +27,17 @@ class KeyboardShortcutsService {
     return _instance!;
   }
 
-  /// Keyboard shortcut customization is only supported on desktop platforms.
+  /// 仅桌面端平台支持键盘快捷键自定义。
   static bool isPlatformSupported() {
     return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
   }
 
   Future<void> _init() async {
     _settingsService = await SettingsService.getInstance();
-    // Ensure settings service is fully initialized before loading data
-    await Future.delayed(Duration.zero); // Allow event loop to complete
-    _shortcuts = _settingsService.getKeyboardShortcuts(); // Keep for legacy compatibility
-    _hotkeys = await _settingsService.getKeyboardHotkeys(); // Primary method
+    // 确保在加载数据前，设置服务已完全初始化
+    await Future.delayed(Duration.zero); // 允许事件循环完成
+    _shortcuts = _settingsService.getKeyboardShortcuts(); // 保留用于旧版兼容性
+    _hotkeys = await _settingsService.getKeyboardHotkeys(); // 主要方法
     _seekTimeSmall = _settingsService.getSeekTimeSmall();
     _seekTimeLarge = _settingsService.getSeekTimeLarge();
     _maxVolume = _settingsService.getMaxVolume();
@@ -59,15 +60,15 @@ class KeyboardShortcutsService {
   }
 
   Future<void> setHotkey(String action, HotKey hotkey) async {
-    // Update local cache first
+    // 首先更新本地缓存
     _hotkeys[action] = hotkey;
 
-    // Save to persistent storage
+    // 保存到持久化存储
     await _settingsService.setKeyboardHotkey(action, hotkey);
 
-    // Verify local cache is still correct
+    // 验证本地缓存是否仍然正确
     if (_hotkeys[action] != hotkey) {
-      _hotkeys[action] = hotkey; // Restore correct value
+      _hotkeys[action] = hotkey; // 恢复正确的值
     }
   }
 
@@ -82,13 +83,13 @@ class KeyboardShortcutsService {
     _hotkeys = _settingsService.getDefaultKeyboardHotkeys();
     await _settingsService.setKeyboardShortcuts(_shortcuts);
     await _settingsService.setKeyboardHotkeys(_hotkeys);
-    // Refresh cache to ensure consistency
+    // 刷新缓存以确保一致性
     await refreshFromStorage();
   }
 
-  // Format HotKey for display
+  // 格式化 HotKey 用于显示
   String formatHotkey(HotKey? hotKey) {
-    if (hotKey == null) return 'No shortcut set';
+    if (hotKey == null) return '未设置快捷键';
 
     final modifiers = <String>[];
     for (final modifier in hotKey.modifiers ?? []) {
@@ -114,7 +115,7 @@ class KeyboardShortcutsService {
       }
     }
 
-    // Format the key name
+    // 格式化按键名称
     String keyName = hotKey.key.keyLabel;
     if (keyName.startsWith('PhysicalKeyboardKey#')) {
       keyName = keyName.substring(20, keyName.length - 1);
@@ -123,35 +124,35 @@ class KeyboardShortcutsService {
       keyName = keyName.substring(3).toUpperCase();
     }
 
-    // Special cases for common keys
+    // 常见按键的特殊处理
     switch (keyName.toLowerCase()) {
       case 'space':
-        keyName = 'Space';
+        keyName = '空格';
         break;
       case 'arrowup':
-        keyName = 'Arrow Up';
+        keyName = '上方向键';
         break;
       case 'arrowdown':
-        keyName = 'Arrow Down';
+        keyName = '下方向键';
         break;
       case 'arrowleft':
-        keyName = 'Arrow Left';
+        keyName = '左方向键';
         break;
       case 'arrowright':
-        keyName = 'Arrow Right';
+        keyName = '右方向键';
         break;
       case 'equal':
-        keyName = 'Plus';
+        keyName = '加号';
         break;
       case 'minus':
-        keyName = 'Minus';
+        keyName = '减号';
         break;
     }
 
     return modifiers.isEmpty ? keyName : '${modifiers.join(' + ')} + $keyName';
   }
 
-  // Handle keyboard input for video player
+  // 处理视频播放器的键盘输入
   KeyEventResult handleVideoPlayerKeyEvent(
     KeyEvent event,
     Player player,
@@ -165,7 +166,7 @@ class KeyboardShortcutsService {
   }) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
-    // Handle back navigation keys (Escape)
+    // 处理返回导航键 (Escape)
     if (event.logicalKey == LogicalKeyboardKey.escape) {
       onBack?.call();
       return KeyEventResult.handled;
@@ -177,19 +178,19 @@ class KeyboardShortcutsService {
     final isAltPressed = HardwareKeyboard.instance.isAltPressed;
     final isMetaPressed = HardwareKeyboard.instance.isMetaPressed;
 
-    // Check each hotkey
+    // 检查每一个热键
     for (final entry in _hotkeys.entries) {
       final action = entry.key;
       final hotkey = entry.value;
 
-      // Check if the physical key matches
+      // 检查物理按键是否匹配
       if (physicalKey != hotkey.key) continue;
 
-      // Check if modifiers match
+      // 检查修饰键是否匹配
       final requiredModifiers = hotkey.modifiers ?? [];
       bool modifiersMatch = true;
 
-      // Check each required modifier
+      // 检查每一个必需的修饰键
       for (final modifier in requiredModifiers) {
         switch (modifier) {
           case HotKeyModifier.shift:
@@ -205,16 +206,16 @@ class KeyboardShortcutsService {
             if (!isMetaPressed) modifiersMatch = false;
             break;
           case HotKeyModifier.capsLock:
-            // CapsLock is typically not used for shortcuts, ignore for now
+            // CapsLock 通常不用于快捷键，暂时忽略
             break;
           case HotKeyModifier.fn:
-            // Fn key is typically not used for shortcuts, ignore for now
+            // Fn 键通常不用于快捷键，暂时忽略
             break;
         }
         if (!modifiersMatch) break;
       }
 
-      // Check that no extra modifiers are pressed
+      // 检查没有按下额外的修饰键
       if (modifiersMatch) {
         final hasShift = requiredModifiers.contains(HotKeyModifier.shift);
         final hasControl = requiredModifiers.contains(HotKeyModifier.control);
@@ -318,56 +319,56 @@ class KeyboardShortcutsService {
     }
   }
 
-  // Get human-readable action names
+  // 获取人类可读的操作名称
   String getActionDisplayName(String action) {
     switch (action) {
       case 'play_pause':
-        return 'Play/Pause';
+        return '播放/暂停';
       case 'volume_up':
-        return 'Volume Up';
+        return '音量调大';
       case 'volume_down':
-        return 'Volume Down';
+        return '音量调小';
       case 'seek_forward':
-        return 'Seek Forward (${_seekTimeSmall}s)';
+        return '前进 (${_seekTimeSmall}秒)';
       case 'seek_backward':
-        return 'Seek Backward (${_seekTimeSmall}s)';
+        return '后退 (${_seekTimeSmall}秒)';
       case 'seek_forward_large':
-        return 'Seek Forward (${_seekTimeLarge}s)';
+        return '大幅前进 (${_seekTimeLarge}秒)';
       case 'seek_backward_large':
-        return 'Seek Backward (${_seekTimeLarge}s)';
+        return '大幅后退 (${_seekTimeLarge}秒)';
       case 'fullscreen_toggle':
-        return 'Toggle Fullscreen';
+        return '切换全屏';
       case 'mute_toggle':
-        return 'Toggle Mute';
+        return '切换静音';
       case 'subtitle_toggle':
-        return 'Toggle Subtitles';
+        return '切换字幕';
       case 'audio_track_next':
-        return 'Next Audio Track';
+        return '下一个音轨';
       case 'subtitle_track_next':
-        return 'Next Subtitle Track';
+        return '下一个字幕轨';
       case 'chapter_next':
-        return 'Next Chapter';
+        return '下一章节';
       case 'chapter_previous':
-        return 'Previous Chapter';
+        return '前一章节';
       case 'speed_increase':
-        return 'Increase Speed';
+        return '提高倍速';
       case 'speed_decrease':
-        return 'Decrease Speed';
+        return '降低倍速';
       case 'speed_reset':
-        return 'Reset Speed';
+        return '重置倍速';
       default:
         return action;
     }
   }
 
-  // Validate if a key combination is valid (legacy method for backward compatibility)
+  // 验证按键组合是否有效（用于向后兼容的旧方法）
   bool isValidKeyShortcut(String keyString) {
-    // For backward compatibility, assume all non-empty strings are valid
-    // The new system will use HotKey objects for validation
+    // 为了向后兼容，假设所有非空字符串都是有效的
+    // 新系统将使用 HotKey 对象进行验证
     return keyString.isNotEmpty;
   }
 
-  // Check if a shortcut is already assigned to another action
+  // 检查快捷键是否已分配给另一个操作
   String? getActionForShortcut(String keyString) {
     for (final entry in _shortcuts.entries) {
       if (entry.value == keyString) {
@@ -377,7 +378,7 @@ class KeyboardShortcutsService {
     return null;
   }
 
-  // Check if a hotkey is already assigned to another action
+  // 检查热键是否已分配给另一个操作
   String? getActionForHotkey(HotKey hotkey) {
     for (final entry in _hotkeys.entries) {
       if (_hotkeyEquals(entry.value, hotkey)) {
@@ -387,7 +388,7 @@ class KeyboardShortcutsService {
     return null;
   }
 
-  // Helper method to compare two HotKey objects
+  // 用于比较两个 HotKey 对象的助手方法
   bool _hotkeyEquals(HotKey a, HotKey b) {
     if (a.key != b.key) return false;
 

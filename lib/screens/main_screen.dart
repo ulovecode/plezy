@@ -27,7 +27,9 @@ import 'settings/settings_screen.dart';
 import 'video_player_screen.dart';
 import '../watch_together/watch_together.dart';
 
-/// Provides access to the main screen's focus control.
+/// 为主屏幕提供焦点控制的 InheritedWidget。
+/// 在 TV 或桌面端，用户需要在侧边栏和主内容区之间切换焦点。
+/// 通过这个 Scope，子组件可以方便地请求焦点切换或查询当前焦点状态。
 class MainScreenFocusScope extends InheritedWidget {
   final VoidCallback focusSidebar;
   final VoidCallback focusContent;
@@ -65,18 +67,20 @@ class _MainScreenState extends State<MainScreen> with RouteAware {
   late int _currentIndex;
   String? _selectedLibraryGlobalKey;
 
-  /// Whether the app is in offline mode (no server connection)
+  /// 应用是否处于离线模式（无法连接到任何服务器）。
   bool _isOffline = false;
 
-  /// Last selected online tab (restored when coming back online after an offline fallback)
+  /// 上一次在线时的标签页 ID。
+  /// 当应用从离线恢复到在线时，我们希望自动回到用户之前浏览的页面。
   NavigationTabId? _lastOnlineTabId;
 
-  /// Whether we auto-switched to Downloads because the previous tab was unavailable offline
+  /// 是否因为之前的标签页在离线模式下不可用而自动切换到了“下载”页。
   bool _autoSwitchedToDownloads = false;
 
   OfflineModeProvider? _offlineModeProvider;
 
   late List<Widget> _screens;
+  // 使用 GlobalKey 来保持各个页面的状态（如滚动位置），即使它们在 IndexedStack 中不处于活动状态。
   final GlobalKey<State<DiscoverScreen>> _discoverKey = GlobalKey();
   final GlobalKey<State<LibrariesScreen>> _librariesKey = GlobalKey();
   final GlobalKey<State<SearchScreen>> _searchKey = GlobalKey();
@@ -84,7 +88,7 @@ class _MainScreenState extends State<MainScreen> with RouteAware {
   final GlobalKey<State<SettingsScreen>> _settingsKey = GlobalKey();
   final GlobalKey<SideNavigationRailState> _sideNavKey = GlobalKey();
 
-  // Focus management for sidebar/content switching
+  // 焦点管理：分别管理侧边栏和内容区的焦点范围。
   final FocusScopeNode _sidebarFocusScope = FocusScopeNode(debugLabel: 'Sidebar');
   final FocusScopeNode _contentFocusScope = FocusScopeNode(debugLabel: 'Content');
   bool _isSidebarFocused = false;
@@ -94,49 +98,49 @@ class _MainScreenState extends State<MainScreen> with RouteAware {
     super.initState();
     _isOffline = widget.isOfflineMode;
 
-    // Start on Downloads tab when in offline mode
-    // In offline mode: visual index 0 = Downloads (screen 3), 1 = Settings (screen 4)
-    // In online mode: indices match directly
+    // 如果处于离线模式，初始索引设为 0（对应离线模式下的下载页）。
     _currentIndex = _isOffline ? 0 : 0;
     _lastOnlineTabId = _isOffline ? null : NavigationTabId.discover;
     _autoSwitchedToDownloads = _isOffline;
 
     _screens = _buildScreens(_isOffline);
 
-    // Set up Watch Together callbacks immediately (must be synchronous to catch early messages)
+    // 立即设置 Watch Together 回调。
+    // 这必须是同步的，以确保能捕获到启动时可能已经存在的早期消息。
     if (!_isOffline) {
       _setupWatchTogetherCallback();
     }
 
-    // Set up data invalidation callback for profile switching (skip in offline mode)
+    // 在第一帧渲染后执行初始化逻辑。
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!_isOffline) {
-        // Initialize UserProfileProvider to ensure it's ready after sign-in
+        // 确保 UserProfileProvider 已就绪。
         final userProfileProvider = context.userProfile;
         await userProfileProvider.initialize();
 
-        // Set up data invalidation callback for profile switching
+        // 设置配置切换时的回调，用于清理所有页面的旧数据。
         userProfileProvider.setDataInvalidationCallback(_invalidateAllScreens);
       }
 
-      // Focus content initially (replaces autofocus which caused focus stealing issues)
+      // 初始焦点分配给内容区，除非侧边栏已被明确激活。
       if (!_isSidebarFocused) {
         _contentFocusScope.requestFocus();
       }
     });
   }
 
-  /// Set up the Watch Together navigation callback for guests
+  /// 为“一起看（Watch Together）”设置导航回调。
   void _setupWatchTogetherCallback() {
     try {
       final watchTogether = context.read<WatchTogetherProvider>();
+      // 当房主切换影片时，所有成员应同步跳转。
       watchTogether.onMediaSwitched = (ratingKey, serverId, mediaTitle) async {
         appLogger.d('WatchTogether: Media switch received - navigating to $mediaTitle');
         await _navigateToWatchTogetherMedia(ratingKey, serverId);
       };
+      // 当房主退出播放器时，为了同步体验，宾客也应自动退出。
       watchTogether.onHostExitedPlayer = () {
         appLogger.d('WatchTogether: Host exited player - exiting player for guest');
-        // Use rootNavigator to ensure we pop the video player even if nested
         if (!mounted) return;
         final navigator = Navigator.of(context, rootNavigator: true);
         bool isVideoPlayerOnTop = false;
@@ -155,9 +159,9 @@ class _MainScreenState extends State<MainScreen> with RouteAware {
     }
   }
 
-  /// Navigate to media when host switches content in Watch Together session
+  /// 当房主在“一起看”会话中切换内容时，导航到相应的媒体页面。
   Future<void> _navigateToWatchTogetherMedia(String ratingKey, String serverId) async {
-    if (!mounted) return; // Check before any context usage
+    if (!mounted) return;
 
     try {
       final multiServer = context.read<MultiServerProvider>();
@@ -168,13 +172,13 @@ class _MainScreenState extends State<MainScreen> with RouteAware {
         return;
       }
 
-      // Fetch the metadata for the new media
+      // 获取新媒体的元数据。
       final metadata = await client.getMetadataWithImages(ratingKey);
 
       if (metadata == null || !mounted) return;
 
-      // Use push to preserve WatchTogetherScreen in navigation stack
-      // VideoPlayerScreen handles its own replacement via onPlayerMediaSwitched
+      // 使用 push 将播放器推入栈中，保持 WatchTogetherScreen 在背景中，
+      // 这样用户退出播放后能回到会话控制界面。
       Navigator.of(context, rootNavigator: true).push(
         MaterialPageRoute(
           settings: const RouteSettings(name: kVideoPlayerRouteName),
@@ -190,11 +194,8 @@ class _MainScreenState extends State<MainScreen> with RouteAware {
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    // Listen for offline/online transitions to refresh navigation & screens
-    // Note: We don't call _handleOfflineStatusChanged() immediately because
-    // widget.isOfflineMode (from SetupScreen navigation) is authoritative for
-    // initial state. The provider may not yet have received the server status
-    // update due to initialization timing. The listener handles runtime changes.
+    // 监听离线/在线状态转换。
+    // 我们不直接使用 initState 中的状态，因为 Provider 的状态可能在异步加载中发生变化。
     final provider = context.read<OfflineModeProvider?>();
     if (provider != null && provider != _offlineModeProvider) {
       _offlineModeProvider?.removeListener(_handleOfflineStatusChanged);
@@ -202,6 +203,7 @@ class _MainScreenState extends State<MainScreen> with RouteAware {
       _offlineModeProvider!.addListener(_handleOfflineStatusChanged);
     }
 
+    // 注册导航观察者。
     routeObserver.subscribe(this, ModalRoute.of(context) as PageRoute);
   }
 
@@ -215,8 +217,7 @@ class _MainScreenState extends State<MainScreen> with RouteAware {
   }
 
   List<Widget> _buildScreens(bool offline) {
-    // In offline mode, only show Downloads and Settings
-    // In online mode, show all 5 screens
+    // 离线模式下，隐藏依赖网络的内容（发现、库、搜索），仅保留下载和设置。
     if (offline) {
       return [DownloadsScreen(key: _downloadsKey), SettingsScreen(key: _settingsKey)];
     }
@@ -230,20 +231,18 @@ class _MainScreenState extends State<MainScreen> with RouteAware {
     ];
   }
 
-  /// Normalize tab index when switching between offline/online modes.
-  /// Preserves the current tab if it exists in the new mode, otherwise defaults to first tab.
+  /// 在离线/在线模式切换时，规范化当前的标签页索引。
+  /// 如果当前选中的标签在目标模式下仍然存在，则保留它；否则重置到第一个标签。
   int _normalizeIndexForMode(int currentIndex, bool wasOffline, bool isOffline) {
     if (wasOffline == isOffline) return currentIndex;
 
     final oldTabs = _getVisibleTabs(wasOffline);
     final newTabs = _getVisibleTabs(isOffline);
 
-    // Get the tab ID at the current index (or first tab if out of bounds)
     final currentTabId = currentIndex >= 0 && currentIndex < oldTabs.length
         ? oldTabs[currentIndex].id
         : oldTabs.first.id;
 
-    // Find the same tab in the new mode's tab list
     final newIndex = newTabs.indexWhere((tab) => tab.id == currentTabId);
     return newIndex >= 0 ? newIndex : 0;
   }
@@ -261,19 +260,19 @@ class _MainScreenState extends State<MainScreen> with RouteAware {
       _selectedLibraryGlobalKey = _isOffline ? null : _selectedLibraryGlobalKey;
 
       if (_isOffline) {
-        // Remember the online tab so we can restore it when reconnecting.
+        // 记录在线时的标签，以便重连后恢复。
         if (!wasOffline) {
           _lastOnlineTabId = previousTabId;
         }
 
         _currentIndex = _normalizeIndexForMode(_currentIndex, wasOffline, _isOffline);
 
-        // Track if we auto-switched to Downloads because the previous tab was unavailable.
+        // 标记是否被迫切换到了下载页。
         _autoSwitchedToDownloads =
             previousTabId != NavigationTabId.downloads &&
             _tabIdForIndex(true, _currentIndex) == NavigationTabId.downloads;
       } else {
-        // Coming back online: restore the last online tab if we forced a switch to Downloads.
+        // 恢复在线：如果之前是自动跳到下载页的，现在跳回之前的在线页面。
         if (_autoSwitchedToDownloads) {
           final restoredTab = _lastOnlineTabId ?? NavigationTabId.discover;
           final restoredIndex = NavigationTab.indexFor(restoredTab, isOffline: _isOffline);
@@ -285,12 +284,12 @@ class _MainScreenState extends State<MainScreen> with RouteAware {
       }
     });
 
-    // Refresh sidebar focus after rebuilding navigation
+    // 重新构建导航后，刷新焦点。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _sideNavKey.currentState?.focusActiveItem();
     });
 
-    // Ensure profile provider is initialized when coming back online
+    // 恢复在线时重新初始化用户配置。
     if (!_isOffline) {
       final userProfileProvider = context.userProfile;
       userProfileProvider.initialize().then((_) {
@@ -302,7 +301,7 @@ class _MainScreenState extends State<MainScreen> with RouteAware {
   void _focusSidebar() {
     setState(() => _isSidebarFocused = true);
     _sidebarFocusScope.requestFocus();
-    // Focus the active item after the focus scope has focus
+    // 确保侧边栏获得焦点后，高亮显示当前的活动项。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _sideNavKey.currentState?.focusActiveItem();
     });
@@ -311,7 +310,7 @@ class _MainScreenState extends State<MainScreen> with RouteAware {
   void _focusContent() {
     setState(() => _isSidebarFocused = false);
     _contentFocusScope.requestFocus();
-    // When content regains focus while on Libraries, retry focusing the active tab
+    // 如果是在“媒体库”页面，内容区获得焦点时应尝试聚焦到活动标签页。
     if (_currentIndex == 1) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_librariesKey.currentState case final FocusableTab focusable) {
@@ -324,8 +323,8 @@ class _MainScreenState extends State<MainScreen> with RouteAware {
   KeyEventResult _handleBackKey(KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
-    // Handle all back keys - this handler is only reached if lower widgets
-    // (e.g., LibrariesScreen tab content/chips) don't handle the back key first
+    // 处理后退键（Esc、手柄 B 键等）。
+    // 这个处理器只有在子组件没有拦截后退键时才会被触发。
     final isBackKey =
         event.logicalKey == LogicalKeyboardKey.escape ||
         event.logicalKey == LogicalKeyboardKey.goBack ||
@@ -334,7 +333,7 @@ class _MainScreenState extends State<MainScreen> with RouteAware {
 
     if (!isBackKey) return KeyEventResult.ignored;
 
-    // Toggle focus between sidebar and content
+    // 快捷操作：在侧边栏和内容区之间快速切换焦点。
     if (_isSidebarFocused) {
       _focusContent();
     } else {

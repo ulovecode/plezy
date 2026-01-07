@@ -8,26 +8,26 @@ import 'app_logger.dart';
 
 const String kVideoPlayerRouteName = '/video_player';
 
-/// Navigates to the VideoPlayerScreen with instant transitions to prevent white flash.
+/// 导航到 VideoPlayerScreen，使用即时过渡以防止白屏闪烁。
 ///
-/// This utility function provides a consistent way to navigate to the video player
-/// across the app, using PageRouteBuilder with zero-duration transitions to eliminate
-/// the white flash that occurs with MaterialPageRoute.
+/// 此工具函数在整个应用程序中提供了一致的视频播放器导航方式，
+/// 使用 PageRouteBuilder 配合零持续时间的过渡，
+/// 以消除 MaterialPageRoute 中出现的白屏闪烁。
 ///
-/// Parameters:
-/// - [context]: The build context for navigation
-/// - [metadata]: The Plex metadata for the content to play
-/// - [preferredAudioTrack]: Optional audio track to select on playback start
-/// - [preferredSubtitleTrack]: Optional subtitle track to select on playback start
-/// - [preferredPlaybackRate]: Optional playback speed to set on playback start
-/// - [selectedMediaIndex]: Optional media version index to use; if not provided,
-///   loads the saved preference for the series/movie. Defaults to 0 if no preference exists.
-/// - [usePushReplacement]: If true, replaces current route instead of pushing;
-///   useful for episode-to-episode navigation. Defaults to false.
-/// - [isOffline]: If true, plays from downloaded content without requiring server connection.
+/// 参数：
+/// - [context]: 用于导航的构建上下文
+/// - [metadata]: 要播放内容的 Plex 元数据
+/// - [preferredAudioTrack]: 可选，播放开始时选择的首选音频轨道
+/// - [preferredSubtitleTrack]: 可选，播放开始时选择的首选字幕轨道
+/// - [preferredPlaybackRate]: 可选，播放开始时设置的首选播放速度
+/// - [selectedMediaIndex]: 可选，要使用的媒体版本索引；如果未提供，
+///   则加载该系列/电影的保存偏好。如果没有偏好设置，则默认为 0。
+/// - [usePushReplacement]: 如果为 true，则替换当前路由而不是推入新路由；
+///   对剧集间的连续播放导航很有用。默认为 false。
+/// - [isOffline]: 如果为 true，则从下载的内容播放，无需服务器连接。
 ///
-/// Returns a Future that completes with a boolean indicating whether the content
-/// was watched, or null if navigation was cancelled.
+/// 返回一个 Future，完成后返回一个布尔值，指示内容是否已被观看，
+/// 如果导航被取消，则返回 null。
 Future<bool?> navigateToVideoPlayer(
   BuildContext context, {
   required PlexMetadata metadata,
@@ -38,10 +38,10 @@ Future<bool?> navigateToVideoPlayer(
   bool usePushReplacement = false,
   bool isOffline = false,
 }) async {
-  // Extract navigator before any async operations
+  // 在任何异步操作之前提取 navigator
   final navigator = Navigator.of(context);
 
-  // Load saved media version preference if not explicitly provided
+  // 如果没有明确提供，则加载保存的媒体版本偏好
   int mediaIndex = selectedMediaIndex ?? 0;
   if (selectedMediaIndex == null) {
     try {
@@ -52,16 +52,16 @@ Future<bool?> navigateToVideoPlayer(
         mediaIndex = savedPreference;
       }
     } catch (e) {
-      // Ignore errors loading preference, use default
+      // 忽略加载偏好时的错误，使用默认值
     }
   }
 
-  // Prevent stacking an identical video player when already active
+  // 防止在已经激活时堆叠相同的视频播放器
   if (!usePushReplacement &&
       VideoPlayerScreenState.activeRatingKey == metadata.ratingKey &&
       VideoPlayerScreenState.activeMediaIndex == mediaIndex) {
     appLogger.d(
-      'Video player already active for ${metadata.ratingKey} (mediaIndex=$mediaIndex), skipping duplicate navigation',
+      '视频播放器已为 ${metadata.ratingKey} (mediaIndex=$mediaIndex) 激活，跳过重复导航',
     );
     return null;
   }
@@ -87,20 +87,20 @@ Future<bool?> navigateToVideoPlayer(
   }
 }
 
-/// Navigates to the video player and optionally refreshes content when returning.
+/// 导航到视频播放器，并可选地在返回时刷新内容。
 ///
-/// This helper consolidates the common pattern of:
-/// 1. Navigating to the video player
-/// 2. Logging the return
-/// 3. Calling a refresh callback if not offline
+/// 此辅助方法整合了以下常见模式：
+/// 1. 导航到视频播放器
+/// 2. 记录返回日志
+/// 3. 如果不是离线模式，则调用刷新回调
 ///
-/// Parameters:
-/// - [context]: The build context for navigation
-/// - [metadata]: The Plex metadata for the content to play
-/// - [isOffline]: If true, plays from downloaded content
-/// - [onRefresh]: Optional callback to refresh data when returning from playback
-///   (only called when not offline)
-/// - All other parameters are passed through to [navigateToVideoPlayer]
+/// 参数：
+/// - [context]: 用于导航的构建上下文
+/// - [metadata]: 要播放内容的 Plex 元数据
+/// - [isOffline]: 如果为 true，则从下载的内容播放
+/// - [onRefresh]: 可选，从播放返回时刷新数据的回调
+///   （仅在非离线模式下调用）
+/// - 所有其他参数都传递给 [navigateToVideoPlayer]
 Future<bool?> navigateToVideoPlayerWithRefresh(
   BuildContext context, {
   required PlexMetadata metadata,
@@ -123,9 +123,9 @@ Future<bool?> navigateToVideoPlayerWithRefresh(
     usePushReplacement: usePushReplacement,
   );
 
-  appLogger.d('Returned from playback, refreshing metadata');
+  appLogger.d('从播放返回，正在刷新元数据');
 
-  // Refresh data when returning from video player (skip if offline)
+  // 从视频播放器返回时刷新数据（离线模式跳过）
   if (!isOffline && onRefresh != null) {
     onRefresh();
   }

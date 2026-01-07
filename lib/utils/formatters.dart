@@ -2,14 +2,14 @@ import 'package:duration/duration.dart';
 import 'package:duration/locale.dart';
 import '../i18n/strings.g.dart';
 
-/// Formats a number with a minimum number of digits using leading zeros.
+/// 使用前导零格式化具有最小位数的数字。
 ///
-/// Example: `padNumber(5, 3)` returns "005"
+/// 示例：`padNumber(5, 3)` 返回 "005"
 String padNumber(int number, int width) {
   return number.toString().padLeft(width, '0');
 }
 
-/// Utility class for formatting byte sizes and speeds
+/// 用于格式化字节大小和速度的工具类
 class ByteFormatter {
   ByteFormatter._();
 
@@ -17,10 +17,10 @@ class ByteFormatter {
   static const int _mb = _kb * 1024;
   static const int _gb = _mb * 1024;
 
-  /// Format bytes to human-readable string (e.g., "1.5 GB", "256.3 MB")
+  /// 将字节格式化为人类可读的字符串（例如 "1.5 GB", "256.3 MB"）
   ///
-  /// [bytes] The number of bytes to format
-  /// [decimals] Number of decimal places (default: 1 for KB/MB, 2 for GB)
+  /// [bytes] 要格式化的字节数
+  /// [decimals] 小数位数（默认值：KB/MB 为 1，GB 为 2）
   static String formatBytes(int bytes, {int? decimals}) {
     if (bytes < _kb) return '$bytes B';
     if (bytes < _mb) {
@@ -32,9 +32,9 @@ class ByteFormatter {
     return '${(bytes / _gb).toStringAsFixed(decimals ?? 2)} GB';
   }
 
-  /// Format speed in bytes per second to human-readable string
+  /// 将每秒字节数的速度格式化为人类可读的字符串
   ///
-  /// [bytesPerSecond] The speed in bytes per second
+  /// [bytesPerSecond] 每秒字节数的速度
   static String formatSpeed(double bytesPerSecond) {
     if (bytesPerSecond < _kb) {
       return '${bytesPerSecond.toStringAsFixed(0)} B/s';
@@ -45,18 +45,18 @@ class ByteFormatter {
     return '${(bytesPerSecond / _mb).toStringAsFixed(1)} MB/s';
   }
 
-  /// Format bitrate in kbps to human-readable string
+  /// 将以 kbps 为单位的比特率格式化为人类可读的字符串
   ///
-  /// [kbps] The bitrate in kilobits per second
+  /// [kbps] 以千比特每秒为单位的比特率
   static String formatBitrate(int kbps) {
     if (kbps < 1000) return '$kbps kbps';
     return '${(kbps / 1000).toStringAsFixed(1)} Mbps';
   }
 
-  /// Format bitrate in bps to human-readable string
+  /// 将以 bps 为单位的比特率格式化为人类可读的字符串
   ///
-  /// [bps] The bitrate in bits per second
-  /// Returns formatted string like "8.5 Mbps", "256 Kbps", or "128 bps"
+  /// [bps] 以比特每秒为单位的比特率
+  /// 返回格式化后的字符串，如 "8.5 Mbps"、"256 Kbps" 或 "128 bps"
   static String formatBitrateBps(int bps) {
     const kbps = 1000;
     const mbps = kbps * 1000;
@@ -71,55 +71,55 @@ class ByteFormatter {
   }
 }
 
-/// Formats a duration in human-readable textual format (e.g., "1h 23m" or "1 hour 23 minutes").
-/// Uses localized unit names based on the current app locale.
-/// Shows hours and minutes only (no seconds).
+/// 将持续时间格式化为人类可读的文本格式（例如 "1h 23m" 或 "1 小时 23 分钟"）。
+/// 根据当前应用程序区域设置使用本地化的单位名称。
+/// 仅显示小时和分钟（不显示秒）。
 ///
-/// Used for: media cards, media details, playlists.
+/// 用于：媒体卡片、媒体详情、播放列表。
 String formatDurationTextual(int milliseconds, {bool abbreviated = true}) {
   final duration = Duration(milliseconds: milliseconds);
 
-  // Get the appropriate locale for the duration package
+  // 获取适用于 duration 包的区域设置
   final durationLocale = _getDurationLocale();
 
-  // Format with abbreviated or full units (h, m) but no seconds
+  // 使用缩写或完整单位（h、m）进行格式化，但不包含秒
   return prettyDuration(
     duration,
     abbreviated: abbreviated,
     locale: durationLocale,
     delimiter: abbreviated ? ' ' : ', ',
     spacer: '',
-    // Configure to show only hours and minutes
+    // 配置为仅显示小时和分钟
     tersity: DurationTersity.minute,
   );
 }
 
-/// Formats a duration in human-readable textual format with seconds (e.g., "1h 23m 45s").
-/// Uses localized unit names based on the current app locale.
-/// Shows hours, minutes, and seconds.
+/// 将持续时间格式化为包含秒的人类可读文本格式（例如 "1h 23m 45s"）。
+/// 根据当前应用程序区域设置使用本地化的单位名称。
+/// 显示小时、分钟和秒。
 ///
-/// Used for: sleep timer countdown.
+/// 用于：睡眠定时器倒计时。
 String formatDurationWithSeconds(Duration duration) {
-  // Get the appropriate locale for the duration package
+  // 获取适用于 duration 包的区域设置
   final durationLocale = _getDurationLocale();
 
-  // Format with abbreviated units (h, m, s) including seconds
+  // 使用包含秒的缩写单位（h、m、s）进行格式化
   return prettyDuration(
     duration,
     abbreviated: true,
     locale: durationLocale,
     delimiter: ' ',
     spacer: '',
-    // Show all non-zero units
+    // 显示所有非零单位
     tersity: DurationTersity.second,
   );
 }
 
-/// Formats a duration in timestamp format (e.g., "1:23:45" or "23:45").
-/// This format is not localized as it follows universal digital clock conventions.
-/// Shows H:MM:SS or M:SS depending on duration.
+/// 将持续时间格式化为时间戳格式（例如 "1:23:45" 或 "23:45"）。
+/// 这种格式不是本地化的，因为它遵循通用的数字时钟约定。
+/// 根据持续时间显示 H:MM:SS 或 M:SS。
 ///
-/// Used for: video controls, chapters, episode durations.
+/// 用于：视频控件、章节、剧集时长。
 String formatDurationTimestamp(Duration duration) {
   final hours = duration.inHours;
   final minutes = duration.inMinutes.remainder(60);
@@ -132,29 +132,28 @@ String formatDurationTimestamp(Duration duration) {
   }
 }
 
-/// Formats a sync offset in milliseconds with sign indicator (e.g., "+150ms", "-250ms").
-/// This format is used for audio/subtitle synchronization adjustments.
+/// 格式化带有符号指示器的毫秒同步偏移量（例如 "+150ms", "-250ms"）。
+/// 此格式用于音频/字幕同步调整。
 ///
-/// Used for: audio sync sheet, sync offset controls.
+/// 用于：音频同步面板、同步偏移控件。
 String formatSyncOffset(double offsetMs) {
   final sign = offsetMs >= 0 ? '+' : '';
   return '$sign${offsetMs.round()}ms';
 }
 
-/// Gets the duration package locale based on the current app locale.
-/// Falls back to English if the locale is not supported by the duration package.
+/// 根据当前应用程序区域设置获取 duration 包的区域设置。
+/// 如果 duration 包不支持该区域设置，则回退到英语。
 DurationLocale _getDurationLocale() {
-  // Get the current locale from slang's LocaleSettings
+  // 从 slang 的 LocaleSettings 获取当前区域设置
   final appLocale = LocaleSettings.currentLocale;
   final languageCode = appLocale.languageCode;
 
-  // Map supported locales to duration package locales
-  // The duration package supports many languages, but we'll focus on the ones
-  // that our app supports: en, de, it, nl, sv, zh
+  // 将支持的区域设置映射到 duration 包的区域设置
+  // duration 包支持许多语言，但我们将重点关注我们应用程序支持的语言：en, de, it, nl, sv, zh
   try {
     return DurationLocale.fromLanguageCode(languageCode) ?? const EnglishDurationLocale();
   } catch (e) {
-    // Fallback to English if language code is not supported
+    // 如果不支持语言代码，则回退到英语
     return const EnglishDurationLocale();
   }
 }

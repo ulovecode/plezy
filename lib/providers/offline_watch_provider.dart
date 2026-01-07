@@ -5,16 +5,16 @@ import '../services/offline_watch_sync_service.dart';
 import '../services/plex_api_cache.dart';
 import 'download_provider.dart';
 
-/// Provider for offline watch status UI state.
+/// 用于离线观看状态 UI 状态的 Provider。
 ///
-/// Provides:
-/// - Effective watch status (local changes + cached server data)
-/// - Offline "OnDeck" calculation for shows
-/// - Manual mark watched/unwatched while offline
+/// 提供：
+/// - 有效的观看状态 (本地更改 + 缓存的服务器数据)
+/// - 剧集的离线 "OnDeck" (待播项目) 计算
+/// - 离线时手动标记已看/未看
 class OfflineWatchProvider extends ChangeNotifier {
   final OfflineWatchSyncService _syncService;
   final DownloadProvider _downloadProvider;
-  // ignore: unused_field - reserved for future cached metadata lookup
+  // ignore: unused_field - 为将来的缓存元数据查找保留
   final PlexApiCache _apiCache;
 
   OfflineWatchProvider({
@@ -24,7 +24,7 @@ class OfflineWatchProvider extends ChangeNotifier {
   }) : _syncService = syncService,
        _downloadProvider = downloadProvider,
        _apiCache = apiCache {
-    // Listen to sync service changes to update UI
+    // 监听同步服务更改以更新 UI
     _syncService.addListener(_onSyncServiceChanged);
   }
 
@@ -32,28 +32,28 @@ class OfflineWatchProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Whether a sync is in progress
+  /// 同步是否正在进行中
   bool get isSyncing => _syncService.isSyncing;
 
-  /// Get count of pending sync items
+  /// 获取待同步项目的数量
   Future<int> getPendingSyncCount() => _syncService.getPendingSyncCount();
 
-  /// Get the effective watch status for a media item.
+  /// 获取媒体项目的有效观看状态。
   ///
-  /// Priority:
-  /// 1. Local offline action (if exists)
-  /// 2. Cached server data from API cache
-  /// 3. Metadata from download provider
+  /// 优先级：
+  /// 1. 本地离线操作 (如果存在)
+  /// 2. 来自 API 缓存的缓存服务器数据
+  /// 3. 来自下载 Provider 的元数据
   ///
-  /// Returns true if watched, false otherwise.
+  /// 如果已观看，则返回 true，否则返回 false。
   Future<bool> isWatched(String globalKey) async {
-    // First check local offline action
+    // 首先检查本地离线操作
     final localStatus = await _syncService.getLocalWatchStatus(globalKey);
     if (localStatus != null) {
       return localStatus;
     }
 
-    // Fall back to cached metadata
+    // 回退到缓存的元数据
     final metadata = _downloadProvider.getMetadata(globalKey);
     if (metadata != null) {
       return metadata.isWatched;
@@ -62,37 +62,37 @@ class OfflineWatchProvider extends ChangeNotifier {
     return false;
   }
 
-  /// Check watch status synchronously using cached metadata.
+  /// 使用缓存的元数据同步检查观看状态。
   ///
-  /// This is useful for UI that can't await, but may not reflect
-  /// the most recent local actions.
+  /// 这对于无法等待的 UI 很有用，但可能无法反映
+  /// 最新的本地操作。
   bool isWatchedSync(PlexMetadata metadata) {
-    // Note: This doesn't check local actions synchronously
-    // because that would require async database access.
-    // For real-time accuracy, use isWatched() instead.
+    // 注意：这不会同步检查本地操作
+    // 因为这需要异步数据库访问。
+    // 为了实时准确性，请改用 isWatched()。
     return metadata.isWatched;
   }
 
-  /// Get the effective view offset (resume position) for a media item.
+  /// 获取媒体项目的有效播放偏移量 (续播位置)。
   ///
-  /// Priority:
-  /// 1. Local offline progress (if exists)
-  /// 2. Metadata from download provider
+  /// 优先级：
+  /// 1. 本地离线进度 (如果存在)
+  /// 2. 来自下载 Provider 的元数据
   ///
-  /// Returns null if no position is available.
+  /// 如果没有位置信息，则返回 null。
   Future<int?> getViewOffset(String globalKey) async {
-    // First check local offline progress
+    // 首先检查本地离线进度
     final localOffset = await _syncService.getLocalViewOffset(globalKey);
     if (localOffset != null) {
       return localOffset;
     }
 
-    // Fall back to cached metadata
+    // 回退到缓存的元数据
     final metadata = _downloadProvider.getMetadata(globalKey);
     return metadata?.viewOffset;
   }
 
-  /// Get sorted episodes for a show (by season, then episode number).
+  /// 获取剧集的排序剧集 (按季，然后按集数)。
   List<PlexMetadata> _getSortedEpisodes(String showRatingKey) {
     final episodes = _downloadProvider.getDownloadedEpisodesForShow(showRatingKey);
     if (episodes.isEmpty) return episodes;
@@ -106,9 +106,9 @@ class OfflineWatchProvider extends ChangeNotifier {
     return episodes;
   }
 
-  /// Batch resolve watch statuses for a list of episodes.
+  /// 批量解析一组剧集的观看状态。
   ///
-  /// Returns a map of globalKey -> isWatched for each episode.
+  /// 返回每集 globalKey -> isWatched 的映射。
   Future<Map<String, bool>> _resolveEpisodeWatchStatuses(List<PlexMetadata> episodes) async {
     if (episodes.isEmpty) return {};
 
@@ -122,70 +122,70 @@ class OfflineWatchProvider extends ChangeNotifier {
     };
   }
 
-  /// Find the next unwatched downloaded episode for a show.
+  /// 查找剧集的下一个未观看的已下载剧集。
   ///
-  /// This is the "offline OnDeck" calculation - finds the first
-  /// episode that hasn't been watched (or is in progress).
+  /// 这是“离线 OnDeck”计算 - 查找第一个
+  /// 尚未观看 (或正在观看) 的剧集。
   ///
-  /// Episodes are sorted by season number, then episode number.
+  /// 剧集按季号排序，然后按集号排序。
   ///
-  /// Returns the next unwatched episode, or the first episode if all watched.
+  /// 返回下一个未观看的剧集，如果全部已看，则返回第一集。
   Future<PlexMetadata?> getNextUnwatchedEpisode(String showRatingKey) async {
     final episodes = _getSortedEpisodes(showRatingKey);
     if (episodes.isEmpty) return null;
 
     final watchStatuses = await _resolveEpisodeWatchStatuses(episodes);
 
-    // Find first unwatched episode
+    // 查找第一个未观看的剧集
     for (final episode in episodes) {
       if (!watchStatuses[episode.globalKey]!) {
         return episode;
       }
     }
 
-    // All episodes watched - return first episode for replay
+    // 所有剧集均已观看 - 返回第一集以供重播
     return episodes.first;
   }
 
-  /// Find the next unwatched downloaded episode synchronously.
+  /// 同步查找下一个未观看的已下载剧集。
   ///
-  /// This uses cached metadata without checking local offline actions.
-  /// For real-time accuracy, use getNextUnwatchedEpisode() instead.
+  /// 这使用缓存的元数据而不检查本地离线操作。
+  /// 为了实时准确性，请改用 getNextUnwatchedEpisode()。
   PlexMetadata? getNextUnwatchedEpisodeSync(String showRatingKey) {
     final episodes = _getSortedEpisodes(showRatingKey);
     if (episodes.isEmpty) return null;
 
-    // Find first unwatched episode (using metadata's isWatched)
+    // 查找第一个未观看的剧集 (使用元数据的 isWatched)
     for (final episode in episodes) {
       if (!episode.isWatched) {
         return episode;
       }
     }
 
-    // All episodes watched - return first episode for replay
+    // 所有剧集均已观看 - 返回第一集以供重播
     return episodes.first;
   }
 
-  /// Mark an item as watched while offline.
+  /// 在离线时将项目标记为已看。
   ///
-  /// This queues the action for sync when online.
+  /// 这会将操作加入队列，以便在在线时同步。
   Future<void> markAsWatched({required String serverId, required String ratingKey}) async {
     await _syncService.queueMarkWatched(serverId: serverId, ratingKey: ratingKey);
     notifyListeners();
   }
 
-  /// Mark an item as unwatched while offline.
+  /// 在离线时将项目标记为未看。
   ///
-  /// This queues the action for sync when online.
+  /// 这会将操作加入队列，以便在在线时同步。
   Future<void> markAsUnwatched({required String serverId, required String ratingKey}) async {
     await _syncService.queueMarkUnwatched(serverId: serverId, ratingKey: ratingKey);
     notifyListeners();
   }
 
-  /// Get downloaded episodes for a show with their watch status.
+  /// 获取剧集的已下载剧集及其观看状态。
   ///
-  /// Returns a list of (episode, isWatched) pairs.
-  /// Uses batched database query for efficiency.
+  /// 返回 (episode, isWatched) 对的列表。
+  /// 为了效率，使用批量数据库查询。
   Future<List<(PlexMetadata episode, bool isWatched)>> getEpisodesWithWatchStatus(String showRatingKey) async {
     final episodes = _downloadProvider.getDownloadedEpisodesForShow(showRatingKey);
     if (episodes.isEmpty) return [];
@@ -195,7 +195,7 @@ class OfflineWatchProvider extends ChangeNotifier {
     return [for (final episode in episodes) (episode, watchStatuses[episode.globalKey]!)];
   }
 
-  /// Trigger a manual sync of pending items.
+  /// 触发待处理项目的手动同步。
   Future<void> syncNow() async {
     await _syncService.syncPendingItems();
   }

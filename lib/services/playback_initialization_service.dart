@@ -10,40 +10,40 @@ import 'download_storage_service.dart';
 import 'dart:io';
 import 'package:drift/drift.dart';
 
-/// Service responsible for fetching video playback data from the Plex server
+/// 负责从 Plex 服务器获取视频播放数据的服务
 class PlaybackInitializationService {
   final PlexClient client;
   final AppDatabase? database;
 
   PlaybackInitializationService({required this.client, this.database});
 
-  /// Format a video path as a URL (adds file:// prefix for file paths)
+  /// 将视频路径格式化为 URL（为文件路径添加 file:// 前缀）
   String _formatVideoUrl(String path) {
     return path.contains('://') ? path : 'file://$path';
   }
 
-  /// Check if content is available offline and return local path
+  /// 检查内容是否在离线状态下可用并返回本地路径
   ///
-  /// Returns the local file path if the video is downloaded and completed.
-  /// Returns null if not available offline or database is not provided.
+  /// 如果视频已下载并完成，则返回本地文件路径。
+  /// 如果离线不可用或未提供数据库，则返回 null。
   Future<String?> getOfflineVideoPath(String serverId, String ratingKey) async {
     if (database == null) {
       return null;
     }
 
     try {
-      // Query database for downloaded media with matching serverId and ratingKey
+      // 在数据库中查询具有匹配 serverId 和 ratingKey 的已下载媒体
       final query = database!.select(database!.downloadedMedia)
         ..where((tbl) => tbl.serverId.equals(serverId) & tbl.ratingKey.equals(ratingKey));
 
       final downloadedItem = await query.getSingleOrNull();
 
-      // Return null if not found or not completed
+      // 如果未找到或未完成，则返回 null
       if (downloadedItem == null || downloadedItem.status != DownloadStatus.completed.index) {
         return null;
       }
 
-      // Return null if no video file path
+      // 如果没有视频文件路径，则返回 null
       if (downloadedItem.videoFilePath == null) {
         return null;
       }
@@ -51,55 +51,55 @@ class PlaybackInitializationService {
       final storageService = DownloadStorageService.instance;
       final storedPath = downloadedItem.videoFilePath!;
 
-      // Get readable path (handles both SAF URIs and file paths)
+      // 获取可读路径（处理 SAF URI 和文件路径）
       final readablePath = await storageService.getReadablePath(storedPath);
 
-      // For file paths (not SAF), verify the file exists
+      // 对于文件路径（非 SAF），验证文件是否存在
       if (!storageService.isSafUri(storedPath)) {
         final file = File(readablePath);
         if (!await file.exists()) {
-          appLogger.w('Offline video file not found: $readablePath (stored as: $storedPath)');
+          appLogger.w('未找到离线视频文件: $readablePath (存储为: $storedPath)');
           return null;
         }
       }
 
-      appLogger.d('Found offline video: $readablePath');
+      appLogger.d('找到离线视频: $readablePath');
       return readablePath;
     } catch (e) {
-      appLogger.w('Error checking offline video path', error: e);
+      appLogger.w('检查离线视频路径时出错', error: e);
       return null;
     }
   }
 
-  /// Fetch playback data for the given metadata
+  /// 获取给定元数据的播放数据
   ///
-  /// Returns a PlaybackInitializationResult with video URL and available versions
-  /// If [preferOffline] is true and offline content is available, uses local file
+  /// 返回包含视频 URL 和可用版本的 PlaybackInitializationResult
+  /// 如果 [preferOffline] 为 true 且离线内容可用，则使用本地文件
   Future<PlaybackInitializationResult> getPlaybackData({
     required PlexMetadata metadata,
     required int selectedMediaIndex,
     bool preferOffline = false,
   }) async {
     try {
-      // Check for offline content first if preferOffline is enabled
+      // 如果启用了 preferOffline，首先检查离线内容
       String? offlineVideoPath;
       if (preferOffline && database != null) {
         offlineVideoPath = await getOfflineVideoPath(client.serverId, metadata.ratingKey);
       }
 
-      // If offline video is available, use it
+      // 如果离线视频可用，则使用它
       if (offlineVideoPath != null) {
-        appLogger.d('Using offline playback for ${metadata.ratingKey}');
+        appLogger.d('正在为 ${metadata.ratingKey} 使用离线播放');
 
-        // For offline playback, we still need to fetch media info for subtitles
-        // but use the local file path for video
+        // 对于离线播放，我们仍需要获取媒体信息以获取字幕，
+        // 但视频使用本地文件路径
         try {
           final playbackData = await client.getVideoPlaybackData(metadata.ratingKey, mediaIndex: selectedMediaIndex);
 
-          // Build list of external subtitle tracks
+          // 构建外部字幕轨道列表
           final externalSubtitles = _buildExternalSubtitles(playbackData.mediaInfo);
 
-          // Return result with local file path
+          // 返回带有本地文件路径的结果
           return PlaybackInitializationResult(
             availableVersions: playbackData.availableVersions,
             videoUrl: _formatVideoUrl(offlineVideoPath),
@@ -108,8 +108,8 @@ class PlaybackInitializationService {
             isOffline: true,
           );
         } catch (e) {
-          // If we can't fetch media info (e.g., no network), use offline-only mode
-          appLogger.w('Failed to fetch media info for offline video, using offline-only mode', error: e);
+          // 如果无法获取媒体信息（例如没有网络），则使用仅离线模式
+          appLogger.w('无法为离线视频获取媒体信息，使用仅离线模式', error: e);
           return PlaybackInitializationResult(
             availableVersions: [],
             videoUrl: _formatVideoUrl(offlineVideoPath),
@@ -120,17 +120,17 @@ class PlaybackInitializationService {
         }
       }
 
-      // Fall back to network streaming
+      // 回退到网络流媒体
       final playbackData = await client.getVideoPlaybackData(metadata.ratingKey, mediaIndex: selectedMediaIndex);
 
       if (!playbackData.hasValidVideoUrl) {
         throw PlaybackException(t.messages.fileInfoNotAvailable);
       }
 
-      // Build list of external subtitle tracks
+      // 构建外部字幕轨道列表
       final externalSubtitles = _buildExternalSubtitles(playbackData.mediaInfo);
 
-      // Return result with available versions and video URL
+      // 返回带有可用版本和视频 URL 的结果
       return PlaybackInitializationResult(
         availableVersions: playbackData.availableVersions,
         videoUrl: playbackData.videoUrl,
@@ -146,7 +146,7 @@ class PlaybackInitializationService {
     }
   }
 
-  /// Build list of external subtitle tracks from media info
+  /// 从媒体信息构建外部字幕轨道列表
   List<SubtitleTrack> _buildExternalSubtitles(PlexMediaInfo? mediaInfo) {
     final externalSubtitles = <SubtitleTrack>[];
 
@@ -157,33 +157,33 @@ class PlaybackInitializationService {
     final externalTracks = mediaInfo.subtitleTracks.where((PlexSubtitleTrack track) => track.isExternal).toList();
 
     if (externalTracks.isNotEmpty) {
-      appLogger.d('Found ${externalTracks.length} external subtitle track(s)');
+      appLogger.d('找到 ${externalTracks.length} 个外部字幕轨道');
     }
 
     for (final plexTrack in externalTracks) {
       try {
-        // Skip if no auth token is available
+        // 如果没有认证令牌，则跳过
         final token = client.config.token;
         if (token == null) {
-          appLogger.w('No auth token available for external subtitles');
+          appLogger.w('没有可用于外部字幕的认证令牌');
           continue;
         }
 
         final url = plexTrack.getSubtitleUrl(client.config.baseUrl, token);
 
-        // Skip if URL couldn't be constructed
+        // 如果无法构建 URL，则跳过
         if (url == null) continue;
 
         externalSubtitles.add(
           SubtitleTrack.uri(
             url,
-            title: plexTrack.displayTitle ?? plexTrack.language ?? 'Track ${plexTrack.id}',
+            title: plexTrack.displayTitle ?? plexTrack.language ?? '轨道 ${plexTrack.id}',
             language: plexTrack.languageCode,
           ),
         );
       } catch (e) {
-        // Silent fallback - log error but continue with other subtitles
-        appLogger.w('Failed to add external subtitle track ${plexTrack.id}', error: e);
+        // 静默回退 - 记录错误但继续处理其他字幕
+        appLogger.w('添加外部字幕轨道 ${plexTrack.id} 失败', error: e);
       }
     }
 
@@ -191,7 +191,7 @@ class PlaybackInitializationService {
   }
 }
 
-/// Result of playback initialization
+/// 播放初始化的结果
 class PlaybackInitializationResult {
   final List<dynamic> availableVersions;
   final String? videoUrl;

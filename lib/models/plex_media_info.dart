@@ -17,16 +17,16 @@ class PlexMediaInfo {
   int? getPartId() => partId;
 }
 
-/// Mixin for building track labels with a consistent pattern
+/// 用于以一致模式构建轨道标签的混入（Mixin）
 mixin TrackLabelBuilder {
   int get id;
   int? get index;
   String? get displayTitle;
   String? get language;
 
-  /// Builds a label from the given parts
-  /// If displayTitle is present, returns it
-  /// Otherwise, combines language and additional parts
+  /// 根据给定的部分构建标签
+  /// 如果存在 displayTitle，则返回它
+  /// 否则，结合语言和其他部分
   String buildLabel(List<String> additionalParts) {
     if (displayTitle != null && displayTitle!.isNotEmpty) {
       return displayTitle!;
@@ -36,7 +36,7 @@ mixin TrackLabelBuilder {
       parts.add(language!);
     }
     parts.addAll(additionalParts);
-    return parts.isEmpty ? 'Track ${index ?? id}' : parts.join(' · ');
+    return parts.isEmpty ? '轨道 ${index ?? id}' : parts.join(' · ');
   }
 }
 
@@ -106,23 +106,23 @@ class PlexSubtitleTrack with TrackLabelBuilder {
 
   String get label {
     final additionalParts = <String>[];
-    if (forced) additionalParts.add('Forced');
+    if (forced) additionalParts.add('强制 (Forced)');
     return buildLabel(additionalParts);
   }
 
-  /// Returns true if this subtitle track is an external file (sidecar subtitle)
-  /// External subtitles have a key property that points to /library/streams/{id}
+  /// 如果此字幕轨道是外部文件（外挂字幕），则返回 true
+  /// 外部字幕具有指向 /library/streams/{id} 的 key 属性
   bool get isExternal => key != null && key!.isNotEmpty;
 
-  /// Constructs the full URL for fetching external subtitle files
-  /// Returns null if this is not an external subtitle
+  /// 构建用于获取外部字幕文件的完整 URL
+  /// 如果不是外部字幕，则返回 null
   String? getSubtitleUrl(String baseUrl, String token) {
     if (!isExternal) return null;
 
-    // Determine file extension based on codec
+    // 根据编解码器确定文件扩展名
     final ext = CodecUtils.getSubtitleExtension(codec);
 
-    // Construct URL with authentication token
+    // 构建带有身份验证令牌的 URL
     return '$baseUrl$key.$ext?X-Plex-Token=$token';
   }
 }
@@ -137,7 +137,7 @@ class PlexChapter {
 
   PlexChapter({required this.id, this.index, this.startTimeOffset, this.endTimeOffset, this.title, this.thumb});
 
-  String get label => title ?? 'Chapter ${(index ?? 0) + 1}';
+  String get label => title ?? '章节 ${(index ?? 0) + 1}';
 
   Duration get startTime => Duration(milliseconds: startTimeOffset ?? 0);
   Duration? get endTime => endTimeOffset != null ? Duration(milliseconds: endTimeOffset!) : null;
@@ -163,7 +163,7 @@ class PlexMarker {
   }
 }
 
-/// Combined chapters and markers fetched in a single API call
+/// 在单次 API 调用中获取的合并章节和标记（Markers）
 class PlaybackExtras {
   final List<PlexChapter> chapters;
   final List<PlexMarker> markers;

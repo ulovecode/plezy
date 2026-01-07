@@ -1,71 +1,71 @@
 import 'package:flutter/widgets.dart';
 
-/// Layout and sizing constants used throughout the application
-/// Screen width breakpoints for responsive design
+/// 整个应用程序中使用的布局和尺寸常量
+/// 响应式设计的屏幕宽度断点
 class ScreenBreakpoints {
-  /// Breakpoint for mobile devices (< 600px)
+  /// 移动设备的断点（< 600px）
   static const double mobile = 600;
 
-  /// Breakpoint for wide tablets / small desktops (900px)
-  /// Used for intermediate responsive layouts
+  /// 宽屏平板电脑 / 小型桌面设备的断点（900px）
+  /// 用于中间响应式布局
   static const double wideTablet = 900;
 
-  /// Breakpoint for desktop devices (1200px)
+  /// 桌面设备的断点（1200px）
   static const double desktop = 1200;
 
-  /// Breakpoint for large desktop devices (1600px)
+  /// 大型桌面设备的断点（1600px）
   static const double largeDesktop = 1600;
 
-  // Legacy alias for backward compatibility
+  // 用于向后兼容的旧别名
   static const double tablet = mobile;
 
-  /// Whether width is mobile-sized (< 600px)
+  /// 宽度是否为移动设备尺寸（< 600px）
   static bool isMobile(double width) => width < mobile;
 
-  /// Whether width is tablet-sized (600px - 1199px)
+  /// 宽度是否为平板电脑尺寸（600px - 1199px）
   static bool isTablet(double width) => width >= mobile && width < desktop;
 
-  /// Whether width is wide tablet (900px - 1199px)
-  /// Useful for layouts that need more columns than phone but less than desktop
+  /// 宽度是否为宽屏平板电脑尺寸（900px - 1199px）
+  /// 适用于需要比手机更多但比桌面设备更少列的布局
   static bool isWideTablet(double width) => width >= wideTablet && width < desktop;
 
-  /// Whether width is desktop-sized (1200px - 1599px)
+  /// 宽度是否为桌面设备尺寸（1200px - 1599px）
   static bool isDesktop(double width) => width >= desktop && width < largeDesktop;
 
-  /// Whether width is large desktop-sized (>= 1600px)
+  /// 宽度是否为大型桌面设备尺寸（>= 1600px）
   static bool isLargeDesktop(double width) => width >= largeDesktop;
 
-  /// Whether width is desktop or larger (>= 1200px)
+  /// 宽度是否为桌面设备或更大（>= 1200px）
   static bool isDesktopOrLarger(double width) => width >= desktop;
 
-  /// Whether width is wide tablet or larger (>= 900px)
+  /// 宽度是否为宽屏平板电脑或更大（>= 900px）
   static bool isWideTabletOrLarger(double width) => width >= wideTablet;
 }
 
-/// Grid layout constants
+/// 网格布局常量
 class GridLayoutConstants {
-  /// Maximum cross-axis extent for grid items in comfortable density mode
+  /// 舒适密度模式下网格项目的最大交叉轴范围
   static const double comfortableDesktop = 280;
   static const double comfortableTablet = 240;
   static const double comfortableMobile = 200;
 
-  /// Maximum cross-axis extent for grid items in compact density mode
+  /// 紧凑密度模式下网格项目的最大交叉轴范围
   static const double compactDesktop = 200;
   static const double compactTablet = 170;
   static const double compactMobile = 140;
 
-  /// Maximum cross-axis extent for grid items in normal density mode
+  /// 标准密度模式下网格项目的最大交叉轴范围
   static const double normalDesktop = 240;
   static const double normalTablet = 200;
   static const double normalMobile = 170;
 
-  /// Default aspect ratio for media cards (poster)
+  /// 媒体卡片的默认宽高比（海报）
   static const double posterAspectRatio = 2 / 3.3;
 
-  /// Grid spacing (edge-to-edge cards)
+  /// 网格间距（边到边卡片）
   static const double crossAxisSpacing = 0;
   static const double mainAxisSpacing = 0;
 
-  /// Standard grid padding
+  /// 标准网格内边距
   static EdgeInsets get gridPadding => const EdgeInsets.fromLTRB(8, 0, 8, 8);
 }

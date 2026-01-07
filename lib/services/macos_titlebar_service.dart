@@ -4,36 +4,36 @@ import 'package:macos_window_utils/macos_window_utils.dart';
 import 'package:macos_window_utils/macos/ns_window_button_type.dart';
 import 'fullscreen_window_delegate.dart';
 
-/// Service to manage macOS titlebar configuration
+/// 用于管理 macOS 标题栏配置的服务
 class MacOSTitlebarService {
-  // Standard button Y position when using custom toolbar
+  // 使用自定义工具栏时的标准按钮 Y 轴位置
   static const double _customButtonY = 21.0;
 
-  /// Initialize the custom titlebar setup (transparent with toolbar)
-  /// This configuration automatically handles fullscreen mode natively
+  /// 初始化自定义标题栏设置 (带有工具栏的透明标题栏)
+  /// 此配置会自动原生处理全屏模式
   static Future<void> setupCustomTitlebar() async {
     if (!Platform.isMacOS) return;
 
-    // Enable window delegate to use presentation options and fullscreen callbacks
+    // 启用窗口委托以使用呈现选项和全屏回调
     await WindowManipulator.initialize(enableWindowDelegate: true);
 
-    // Register custom delegate to handle fullscreen transitions
+    // 注册自定义委托以处理全屏转换
     final delegate = FullscreenWindowDelegate();
     WindowManipulator.addNSWindowDelegate(delegate);
 
-    // Make titlebar transparent but keep it functional
+    // 使标题栏透明但保持其功能
     await WindowManipulator.makeTitlebarTransparent();
     await WindowManipulator.hideTitle();
     await WindowManipulator.enableFullSizeContentView();
 
-    // Add toolbar to create space for traffic lights in normal mode
+    // 添加工具栏以在普通模式下为红绿灯按钮腾出空间
     await WindowManipulator.addToolbar();
 
-    // Set custom traffic light positions for normal mode
+    // 设置普通模式下的自定义红绿灯按钮位置
     await _setCustomButtonPositions();
 
-    // Configure fullscreen presentation to auto-hide toolbar and menubar
-    // This tells macOS to automatically hide the toolbar when entering fullscreen
+    // 配置全屏呈现以自动隐藏工具栏和菜单栏
+    // 这告诉 macOS 在进入全屏时自动隐藏工具栏
     final presentationOptions = NSAppPresentationOptions.from({
       NSAppPresentationOption.fullScreen,
       NSAppPresentationOption.autoHideToolbar,
@@ -43,7 +43,7 @@ class MacOSTitlebarService {
     presentationOptions.applyAsFullScreenPresentationOptions();
   }
 
-  /// Set traffic light buttons to custom positions (with toolbar offset)
+  /// 将红绿灯按钮设置为自定义位置 (带有工具栏偏移量)
   static Future<void> _setCustomButtonPositions() async {
     await WindowManipulator.overrideStandardWindowButtonPosition(
       buttonType: NSWindowButtonType.closeButton,

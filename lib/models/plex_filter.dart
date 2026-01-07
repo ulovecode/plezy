@@ -1,8 +1,14 @@
+/// Plex 过滤器模型
 class PlexFilter {
+  /// 过滤器字段名
   final String filter;
+  /// 过滤器类型（如 string, integer）
   final String filterType;
+  /// 过滤器唯一键
   final String key;
+  /// 过滤器显示标题
   final String title;
+  /// 类型
   final String type;
 
   PlexFilter({
@@ -28,9 +34,13 @@ class PlexFilter {
   }
 }
 
+/// Plex 过滤器值模型
 class PlexFilterValue {
+  /// 值的唯一键
   final String key;
+  /// 值的显示标题
   final String title;
+  /// 类型
   final String? type;
 
   PlexFilterValue({required this.key, required this.title, this.type});

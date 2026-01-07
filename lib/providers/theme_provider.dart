@@ -3,6 +3,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import '../services/settings_service.dart' as settings;
 import '../theme/mono_theme.dart';
 
+/// 用于管理应用主题（亮色/暗色/系统）的 Provider。
 class ThemeProvider extends ChangeNotifier {
   late settings.SettingsService _settingsService;
   settings.ThemeMode _themeMode = settings.ThemeMode.system;
@@ -12,7 +13,7 @@ class ThemeProvider extends ChangeNotifier {
     _systemBrightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
     _initializeSettings();
 
-    // Listen to system theme changes
+    // 监听系统主题变化
     WidgetsBinding.instance.platformDispatcher.onPlatformBrightnessChanged = () {
       _systemBrightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
       if (_themeMode == settings.ThemeMode.system) {
@@ -27,11 +28,16 @@ class ThemeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 获取当前的主题模式设置
   settings.ThemeMode get themeMode => _themeMode;
 
+  /// 获取亮色主题数据
   ThemeData get lightTheme => monoTheme(dark: false);
+  
+  /// 获取暗色主题数据
   ThemeData get darkTheme => monoTheme(dark: true);
 
+  /// 将内部主题模式转换为 Flutter 的 ThemeMode
   ThemeMode get materialThemeMode {
     switch (_themeMode) {
       case settings.ThemeMode.light:
@@ -43,6 +49,7 @@ class ThemeProvider extends ChangeNotifier {
     }
   }
 
+  /// 判断当前是否处于暗色模式（考虑系统设置）
   bool get isDarkMode {
     switch (_themeMode) {
       case settings.ThemeMode.light:
@@ -54,6 +61,7 @@ class ThemeProvider extends ChangeNotifier {
     }
   }
 
+  /// 设置新的主题模式并持久化
   Future<void> setThemeMode(settings.ThemeMode mode) async {
     if (_themeMode != mode) {
       _themeMode = mode;
@@ -62,17 +70,19 @@ class ThemeProvider extends ChangeNotifier {
     }
   }
 
+  /// 获取主题模式的本地化显示名称
   String get themeModeDisplayName {
     switch (_themeMode) {
       case settings.ThemeMode.light:
-        return 'Light';
+        return '浅色';
       case settings.ThemeMode.dark:
-        return 'Dark';
+        return '深色';
       case settings.ThemeMode.system:
-        return 'System';
+        return '系统';
     }
   }
 
+  /// 获取对应主题模式的图标
   IconData get themeModeIcon {
     switch (_themeMode) {
       case settings.ThemeMode.light:
@@ -84,6 +94,7 @@ class ThemeProvider extends ChangeNotifier {
     }
   }
 
+  /// 在 浅色 -> 深色 -> 系统 模式之间循环切换
   void toggleTheme() {
     switch (_themeMode) {
       case settings.ThemeMode.system:

@@ -3,12 +3,11 @@ import 'package:flutter/services.dart';
 
 import 'dpad_navigator.dart';
 
-/// Handles back key events by popping the current route.
+/// 通过弹出当前路由来处理返回键事件。
 ///
-/// Optionally pass a [result] to return to the previous route.
+/// 可以选择传递一个 [result] 以返回到上一个路由。
 ///
-/// Use this as an `onKeyEvent` callback for Focus widgets that need
-/// simple back navigation behavior:
+/// 将此函数用作需要简单返回导航行为的 Focus 小部件的 `onKeyEvent` 回调：
 ///
 /// ```dart
 /// Focus(
@@ -17,7 +16,7 @@ import 'dpad_navigator.dart';
 /// )
 /// ```
 ///
-/// With a result value:
+/// 带有结果值：
 /// ```dart
 /// Focus(
 ///   onKeyEvent: (node, event) => handleBackKeyNavigation(

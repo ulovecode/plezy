@@ -8,45 +8,45 @@ import '../utils/app_logger.dart';
 import 'plex_auth_service.dart';
 import 'storage_service.dart';
 
-/// Manages multiple Plex server connections simultaneously
+/// 同时管理多个 Plex 服务器连接
 class MultiServerManager {
-  /// Map of serverId (clientIdentifier) to PlexClient instances
+  /// serverId (clientIdentifier) 到 PlexClient 实例的映射
   final Map<String, PlexClient> _clients = {};
 
-  /// Map of serverId to server info
+  /// serverId 到服务器信息的映射
   final Map<String, PlexServer> _servers = {};
 
-  /// Map of serverId to online status
+  /// serverId 到在线状态的映射
   final Map<String, bool> _serverStatus = {};
 
-  /// Stream controller for server status changes
+  /// 服务器状态变更的流控制器
   final _statusController = StreamController<Map<String, bool>>.broadcast();
 
-  /// Stream of server status changes
+  /// 服务器状态变更的流
   Stream<Map<String, bool>> get statusStream => _statusController.stream;
 
-  /// Connectivity subscription for network monitoring
+  /// 用于网络监控的连接状态订阅
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
-  /// Map of serverId to active optimization futures
+  /// serverId 到活跃优化 Future 的映射
   final Map<String, Future<void>> _activeOptimizations = {};
 
-  /// Get all registered server IDs
+  /// 获取所有已注册的服务器 ID
   List<String> get serverIds => _servers.keys.toList();
 
-  /// Get all online server IDs
+  /// 获取所有在线的服务器 ID
   List<String> get onlineServerIds => _serverStatus.entries.where((e) => e.value).map((e) => e.key).toList();
 
-  /// Get all offline server IDs
+  /// 获取所有离线的服务器 ID
   List<String> get offlineServerIds => _serverStatus.entries.where((e) => !e.value).map((e) => e.key).toList();
 
-  /// Get client for specific server
+  /// 获取特定服务器的客户端
   PlexClient? getClient(String serverId) => _clients[serverId];
 
-  /// Get server info for specific server
+  /// 获取特定服务器的服务器信息
   PlexServer? getServer(String serverId) => _servers[serverId];
 
-  /// Get all online clients
+  /// 获取所有在线的客户端
   Map<String, PlexClient> get onlineClients {
     final result = <String, PlexClient>{};
     for (final serverId in onlineServerIds) {
@@ -58,20 +58,19 @@ class MultiServerManager {
     return result;
   }
 
-  /// Get all servers
+  /// 获取所有服务器
   Map<String, PlexServer> get servers => Map.unmodifiable(_servers);
 
-  /// Check if a server is online
+  /// 检查服务器是否在线
   bool isServerOnline(String serverId) => _serverStatus[serverId] ?? false;
 
-  /// Creates and initializes a PlexClient for a given server
+  /// 为给定服务器创建并初始化 PlexClient
   ///
-  /// Handles finding working connection, loading cached endpoint,
-  /// creating config, and building client with failover support.
+  /// 处理寻找可用连接、加载缓存端点、创建配置以及构建具有故障转移支持的客户端。
   Future<PlexClient> _createClientForServer({required PlexServer server, required String clientIdentifier}) async {
     final serverId = server.clientIdentifier;
 
-    // Find best working connection
+    // 寻找最佳可用连接
     PlexConnection? workingConnection;
     await for (final connection in server.findBestWorkingConnection()) {
       workingConnection = connection;
@@ -79,16 +78,16 @@ class MultiServerManager {
     }
 
     if (workingConnection == null) {
-      throw Exception('No working connection found');
+      throw Exception('未找到可用连接');
     }
 
     final baseUrl = workingConnection.uri;
 
-    // Get storage and load cached endpoint for this server
+    // 获取存储并加载此服务器的缓存端点
     final storage = await StorageService.getInstance();
     final cachedEndpoint = storage.getServerEndpoint(serverId);
 
-    // Create PlexClient with failover support
+    // 创建具有故障转移支持的 PlexClient
     final prioritizedEndpoints = server.prioritizedEndpointUrls(preferredFirst: cachedEndpoint ?? baseUrl);
     final config = await PlexConfig.create(
       baseUrl: baseUrl,
@@ -103,18 +102,18 @@ class MultiServerManager {
       prioritizedEndpoints: prioritizedEndpoints,
       onEndpointChanged: (newUrl) async {
         await storage.saveServerEndpoint(serverId, newUrl);
-        appLogger.i('Updated endpoint for ${server.name} after failover: $newUrl');
+        appLogger.i('故障转移后更新 ${server.name} 的端点: $newUrl');
       },
     );
 
-    // Save the initial endpoint
+    // 保存初始端点
     await storage.saveServerEndpoint(serverId, baseUrl);
 
     return client;
   }
 
-  /// Connect to all available servers in parallel
-  /// Returns the number of successfully connected servers
+  /// 并行连接到所有可用服务器
+  /// 返回成功连接的服务器数量
   Future<int> connectToAllServers(
     List<PlexServer> servers, {
     String? clientIdentifier,
@@ -123,37 +122,37 @@ class MultiServerManager {
     Function(String serverId, Object error)? onServerFailed,
   }) async {
     if (servers.isEmpty) {
-      appLogger.w('No servers to connect to');
+      appLogger.w('没有可连接的服务器');
       return 0;
     }
 
-    appLogger.i('Connecting to ${servers.length} servers...');
+    appLogger.i('正在连接到 ${servers.length} 个服务器...');
 
-    // Use provided client ID or generate a unique one for this app instance
+    // 使用提供的客户端 ID 或为此应用实例生成一个唯一的 ID
     final effectiveClientId = clientIdentifier ?? DateTime.now().millisecondsSinceEpoch.toString();
 
-    // Create connection tasks for all servers
+    // 为所有服务器创建连接任务
     final connectionFutures = servers.map((server) async {
       final serverId = server.clientIdentifier;
 
       try {
-        appLogger.d('Attempting connection to server: ${server.name}');
+        appLogger.d('尝试连接服务器: ${server.name}');
 
         final client = await _createClientForServer(server: server, clientIdentifier: effectiveClientId);
 
-        // Store the client and server info
+        // 存储客户端和服务器信息
         _clients[serverId] = client;
         _servers[serverId] = server;
         _serverStatus[serverId] = true;
 
         onServerConnected?.call(serverId, client);
-        appLogger.i('Successfully connected to ${server.name}');
+        appLogger.i('成功连接到 ${server.name}');
 
         return serverId;
       } catch (e, stackTrace) {
-        appLogger.e('Failed to connect to ${server.name}', error: e, stackTrace: stackTrace);
+        appLogger.e('连接 ${server.name} 失败', error: e, stackTrace: stackTrace);
 
-        // Mark as offline
+        // 标记为离线
         _servers[serverId] = server;
         _serverStatus[serverId] = false;
 
@@ -162,28 +161,28 @@ class MultiServerManager {
       }
     });
 
-    // Wait for all connections with timeout
+    // 等待所有连接完成（带超时控制）
     final results = await Future.wait(
       connectionFutures.map(
         (f) => f.timeout(
           timeout,
           onTimeout: () {
-            appLogger.w('Server connection timed out');
+            appLogger.w('服务器连接超时');
             return null;
           },
         ),
       ),
     );
 
-    // Count successful connections
+    // 统计成功连接的数量
     final successCount = results.where((id) => id != null).length;
 
-    // Notify listeners of status change
+    // 通知监听者状态变更
     _statusController.add(Map.from(_serverStatus));
 
-    appLogger.i('Connected to $successCount/${servers.length} servers successfully');
+    appLogger.i('成功连接到 $successCount/${servers.length} 个服务器');
 
-    // Start network monitoring if we have any connected servers
+    // 如果有任何成功连接的服务器，则启动网络监控
     if (successCount > 0) {
       startNetworkMonitoring();
     }
@@ -191,28 +190,28 @@ class MultiServerManager {
     return successCount;
   }
 
-  /// Add a single server connection
+  /// 添加单个服务器连接
   Future<bool> addServer(PlexServer server, {String? clientIdentifier}) async {
     final serverId = server.clientIdentifier;
     final effectiveClientId = clientIdentifier ?? DateTime.now().millisecondsSinceEpoch.toString();
 
     try {
-      appLogger.d('Adding server: ${server.name}');
+      appLogger.d('正在添加服务器: ${server.name}');
 
       final client = await _createClientForServer(server: server, clientIdentifier: effectiveClientId);
 
-      // Store
+      // 存储
       _clients[serverId] = client;
       _servers[serverId] = server;
       _serverStatus[serverId] = true;
 
-      // Notify
+      // 通知
       _statusController.add(Map.from(_serverStatus));
 
-      appLogger.i('Successfully added server: ${server.name}');
+      appLogger.i('成功添加服务器: ${server.name}');
       return true;
     } catch (e, stackTrace) {
-      appLogger.e('Failed to add server ${server.name}', error: e, stackTrace: stackTrace);
+      appLogger.e('添加服务器 ${server.name} 失败', error: e, stackTrace: stackTrace);
 
       _servers[serverId] = server;
       _serverStatus[serverId] = false;
@@ -222,38 +221,38 @@ class MultiServerManager {
     }
   }
 
-  /// Remove a server connection
+  /// 移除服务器连接
   void removeServer(String serverId) {
     _clients.remove(serverId);
     _servers.remove(serverId);
     _serverStatus.remove(serverId);
     _statusController.add(Map.from(_serverStatus));
-    appLogger.i('Removed server: $serverId');
+    appLogger.i('已移除服务器: $serverId');
   }
 
-  /// Update server status (used for health monitoring)
+  /// 更新服务器状态（用于健康监测）
   void updateServerStatus(String serverId, bool isOnline) {
     if (_serverStatus[serverId] != isOnline) {
       _serverStatus[serverId] = isOnline;
       _statusController.add(Map.from(_serverStatus));
-      appLogger.d('Server $serverId status changed to: $isOnline');
+      appLogger.d('服务器 $serverId 状态变更为: $isOnline');
     }
   }
 
-  /// Test connection health for all servers
+  /// 测试所有服务器的连接健康状况
   Future<void> checkServerHealth() async {
-    appLogger.d('Checking health for ${_clients.length} servers');
+    appLogger.d('正在检查 ${_clients.length} 个服务器的健康状况');
 
     final healthChecks = _clients.entries.map((entry) async {
       final serverId = entry.key;
       final client = entry.value;
 
       try {
-        // Simple ping by fetching server identity
+        // 通过获取服务器标识进行简单的 ping 测试
         await client.getServerIdentity();
         updateServerStatus(serverId, true);
       } catch (e) {
-        appLogger.w('Server $serverId health check failed: $e');
+        appLogger.w('服务器 $serverId 健康检查失败: $e');
         updateServerStatus(serverId, false);
       }
     });
@@ -261,26 +260,26 @@ class MultiServerManager {
     await Future.wait(healthChecks);
   }
 
-  /// Start monitoring network connectivity for all servers
+  /// 为所有服务器启动网络连接监控
   void startNetworkMonitoring() {
     if (_connectivitySubscription != null) {
-      appLogger.d('Network monitoring already active');
+      appLogger.d('网络监控已处于活跃状态');
       return;
     }
 
-    appLogger.i('Starting network monitoring for all servers');
+    appLogger.i('正在为所有服务器启动网络监控');
     final connectivity = Connectivity();
     _connectivitySubscription = connectivity.onConnectivityChanged.listen(
       (results) {
         final status = results.isNotEmpty ? results.first : ConnectivityResult.none;
 
         if (status == ConnectivityResult.none) {
-          appLogger.w('Connectivity lost, pausing optimization until network returns');
+          appLogger.w('网络连接丢失，暂停优化直到网络恢复');
           return;
         }
 
         appLogger.d(
-          'Connectivity change detected, re-optimizing all servers',
+          '检测到网络变更，重新优化所有服务器',
           error: {
             'status': status.name,
             'interfaces': results.map((r) => r.name).toList(),
@@ -288,40 +287,40 @@ class MultiServerManager {
           },
         );
 
-        // Re-optimize all servers
+        // 重新优化所有服务器
         _reoptimizeAllServers(reason: 'connectivity:${status.name}');
       },
       onError: (error, stackTrace) {
-        appLogger.w('Connectivity listener error', error: error, stackTrace: stackTrace);
+        appLogger.w('连接状态监听器错误', error: error, stackTrace: stackTrace);
       },
     );
   }
 
-  /// Stop monitoring network connectivity
+  /// 停止网络连接监控
   void stopNetworkMonitoring() {
     _connectivitySubscription?.cancel();
     _connectivitySubscription = null;
-    appLogger.i('Stopped network monitoring');
+    appLogger.i('已停止网络监控');
   }
 
-  /// Re-optimize all connected servers
+  /// 重新优化所有已连接的服务器
   void _reoptimizeAllServers({required String reason}) {
     for (final entry in _servers.entries) {
       final serverId = entry.key;
       final server = entry.value;
 
-      // Skip if server is offline
+      // 如果服务器离线，则跳过
       if (!isServerOnline(serverId)) {
         continue;
       }
 
-      // Skip if optimization already running for this server
+      // 如果此服务器已在运行优化，则跳过
       if (_activeOptimizations.containsKey(serverId)) {
-        appLogger.d('Optimization already running for ${server.name}, skipping', error: {'reason': reason});
+        appLogger.d('${server.name} 的优化已在运行中，跳过', error: {'reason': reason});
         continue;
       }
 
-      // Run optimization
+      // 运行优化
       _activeOptimizations[serverId] = _reoptimizeServer(serverId: serverId, server: server, reason: reason)
           .whenComplete(() {
             _activeOptimizations.remove(serverId);
@@ -329,38 +328,38 @@ class MultiServerManager {
     }
   }
 
-  /// Re-optimize connection for a specific server
+  /// 为特定服务器重新优化连接
   Future<void> _reoptimizeServer({required String serverId, required PlexServer server, required String reason}) async {
     final storage = await StorageService.getInstance();
     final client = _clients[serverId];
 
     try {
-      appLogger.d('Starting connection optimization for ${server.name}', error: {'reason': reason});
+      appLogger.d('开始为 ${server.name} 进行连接优化', error: {'reason': reason});
 
       await for (final connection in server.findBestWorkingConnection()) {
         final newUrl = connection.uri;
 
-        // Check if this is actually a better connection than current
+        // 检查这是否确实比当前连接更好
         if (client != null && client.config.baseUrl == newUrl) {
-          appLogger.d('Already using optimal endpoint for ${server.name}: $newUrl');
+          appLogger.d('${server.name} 已在使用最优端点: $newUrl');
           continue;
         }
 
-        // Save the new endpoint
+        // 保存新端点
         await storage.saveServerEndpoint(serverId, newUrl);
 
-        // If client has endpoint failover, it will automatically switch
-        // Otherwise, we might need to recreate the client (but failover should handle it)
-        appLogger.i('Updated optimal endpoint for ${server.name}: $newUrl', error: {'type': connection.displayType});
+        // 如果客户端支持端点故障转移，它将自动切换
+        // 否则，我们可能需要重新创建客户端（但故障转移逻辑应该能处理它）
+        appLogger.i('已更新 ${server.name} 的最优端点: $newUrl', error: {'type': connection.displayType});
       }
     } catch (e, stackTrace) {
-      appLogger.w('Connection optimization failed for ${server.name}', error: e, stackTrace: stackTrace);
+      appLogger.w('${server.name} 的连接优化失败', error: e, stackTrace: stackTrace);
     }
   }
 
-  /// Disconnect all servers
+  /// 断开所有服务器连接
   void disconnectAll() {
-    appLogger.i('Disconnecting all servers');
+    appLogger.i('正在断开所有服务器连接');
     stopNetworkMonitoring();
     _clients.clear();
     _servers.clear();
@@ -369,7 +368,7 @@ class MultiServerManager {
     _statusController.add({});
   }
 
-  /// Dispose resources
+  /// 释放资源
   void dispose() {
     disconnectAll();
     _statusController.close();

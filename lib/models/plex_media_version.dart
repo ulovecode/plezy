@@ -22,9 +22,9 @@ class PlexMediaVersion {
     required this.partKey,
   });
 
-  /// Creates a PlexMediaVersion from Plex API Media object
+  /// 从 Plex API 的 Media 对象创建 PlexMediaVersion
   factory PlexMediaVersion.fromJson(Map<String, dynamic> json) {
-    // Get the first Part key for playback
+    // 获取用于播放的第一个 Part key
     final parts = json['Part'] as List<dynamic>?;
     final partKey = parts != null && parts.isNotEmpty ? parts[0]['key'] as String? ?? '' : '';
 
@@ -40,31 +40,31 @@ class PlexMediaVersion {
     );
   }
 
-  /// Display label with detailed information: "1080p H.264 MKV (8.5 Mbps)"
+  /// 包含详细信息的显示标签：例如 "1080p H.264 MKV (8.5 Mbps)"
   String get displayLabel {
     final parts = <String>[];
 
-    // Add resolution
+    // 添加分辨率
     if (videoResolution != null && videoResolution!.isNotEmpty) {
       parts.add('${videoResolution}p');
     } else if (height != null) {
       parts.add('${height}p');
     }
 
-    // Add codec
+    // 添加编解码器
     if (videoCodec != null && videoCodec!.isNotEmpty) {
       parts.add(CodecUtils.formatVideoCodec(videoCodec!));
     }
 
-    // Add container
+    // 添加容器格式
     if (container != null && container!.isNotEmpty) {
       parts.add(container!.toUpperCase());
     }
 
-    // Build main label
-    String label = parts.isNotEmpty ? parts.join(' ') : 'Unknown';
+    // 构建主标签
+    String label = parts.isNotEmpty ? parts.join(' ') : '未知';
 
-    // Add bitrate in parentheses
+    // 在括号中添加比特率
     if (bitrate != null && bitrate! > 0) {
       label += ' (${ByteFormatter.formatBitrate(bitrate!)})';
     }

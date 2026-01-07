@@ -1,16 +1,16 @@
 import 'package:flutter/foundation.dart';
 
-/// Provider for tracking server-specific UI state
-/// Manages which server is currently in context for detail views
+/// 用于跟踪特定服务器 UI 状态的 Provider
+/// 管理当前在详情视图中处于上下文的服务器
 class ServerStateProvider extends ChangeNotifier {
   String? _currentServerId;
   final Map<String, bool> _serverConnectionStates = {};
   final Map<String, String?> _serverErrors = {};
 
-  /// Get the currently selected server ID (for detail views)
+  /// 获取当前选定的服务器 ID（用于详情视图）
   String? get currentServerId => _currentServerId;
 
-  /// Set the current server context (e.g., when viewing a library from a specific server)
+  /// 设置当前的服务器上下文（例如，当从特定服务器查看库时）
   void setCurrentServer(String? serverId) {
     if (_currentServerId != serverId) {
       _currentServerId = serverId;
@@ -18,7 +18,7 @@ class ServerStateProvider extends ChangeNotifier {
     }
   }
 
-  /// Clear the current server selection
+  /// 清除当前服务器的选择
   void clearCurrentServer() {
     if (_currentServerId != null) {
       _currentServerId = null;
@@ -26,12 +26,12 @@ class ServerStateProvider extends ChangeNotifier {
     }
   }
 
-  /// Get connection state for a server
+  /// 获取服务器的连接状态
   bool isServerConnected(String serverId) {
     return _serverConnectionStates[serverId] ?? false;
   }
 
-  /// Update connection state for a server
+  /// 更新服务器的连接状态
   void updateServerConnectionState(String serverId, bool isConnected) {
     if (_serverConnectionStates[serverId] != isConnected) {
       _serverConnectionStates[serverId] = isConnected;
@@ -39,18 +39,18 @@ class ServerStateProvider extends ChangeNotifier {
     }
   }
 
-  /// Get error message for a server (null if no error)
+  /// 获取服务器的错误消息（如果没有错误则为 null）
   String? getServerError(String serverId) {
     return _serverErrors[serverId];
   }
 
-  /// Set error for a server
+  /// 设置服务器的错误
   void setServerError(String serverId, String? error) {
     _serverErrors[serverId] = error;
     notifyListeners();
   }
 
-  /// Clear error for a server
+  /// 清除服务器的错误
   void clearServerError(String serverId) {
     if (_serverErrors.containsKey(serverId)) {
       _serverErrors.remove(serverId);
@@ -58,7 +58,7 @@ class ServerStateProvider extends ChangeNotifier {
     }
   }
 
-  /// Clear all server errors
+  /// 清除所有服务器错误
   void clearAllServerErrors() {
     if (_serverErrors.isNotEmpty) {
       _serverErrors.clear();
@@ -66,7 +66,7 @@ class ServerStateProvider extends ChangeNotifier {
     }
   }
 
-  /// Reset all state
+  /// 重置所有状态
   void reset() {
     _currentServerId = null;
     _serverConnectionStates.clear();

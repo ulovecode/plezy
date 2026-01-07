@@ -1,26 +1,26 @@
 import '../utils/formatters.dart';
 
 enum DownloadStatus {
-  queued,
-  downloading,
-  paused,
-  completed,
-  failed,
-  cancelled,
-  partial, // Some episodes downloaded, but not all (for shows/seasons)
+  queued, // 已加入队列
+  downloading, // 正在下载
+  paused, // 已暂停
+  completed, // 已完成
+  failed, // 失败
+  cancelled, // 已取消
+  partial, // 部分下载（适用于剧集/季，已下载部分集但未全部完成）
 }
 
 class DownloadProgress {
   final String globalKey;
   final DownloadStatus status;
-  final int progress; // 0-100
-  final int downloadedBytes;
-  final int totalBytes;
-  final double speed; // bytes per second
-  final String? errorMessage;
-  final String? currentFile; // What's being downloaded (video, subtitles, artwork)
+  final int progress; // 进度 0-100
+  final int downloadedBytes; // 已下载字节数
+  final int totalBytes; // 总字节数
+  final double speed; // 下载速度（字节/秒）
+  final String? errorMessage; // 错误信息
+  final String? currentFile; // 当前正在下载的文件（视频、字幕、封面图等）
 
-  // Thumbnail path (populated after artwork download completes)
+  // 缩略图路径（在封面图下载完成后填充）
   final String? thumbPath;
 
   const DownloadProgress({
@@ -48,7 +48,7 @@ class DownloadProgress {
     return Duration(seconds: (remainingBytes / speed).round());
   }
 
-  /// Check if this progress update includes artwork paths
+  /// 检查此进度更新是否包含艺术图路径
   bool get hasArtworkPaths => thumbPath != null;
 
   DownloadProgress copyWith({

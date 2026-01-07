@@ -2,23 +2,21 @@ import 'package:flutter/material.dart';
 import '../services/plex_client.dart';
 import '../models/plex_metadata.dart';
 
-/// Mixin for screens that need to update individual items after watch state changes
+/// 在观看状态改变后需要更新单个项目的屏幕所使用的混入（Mixin）。
 ///
-/// This provides a standard implementation for fetching updated metadata
-/// and replacing items in lists, while allowing each screen to customize
-/// which lists should be updated.
+/// 这为获取更新的元数据和替换列表中的项目提供了标准实现，
+/// 同时允许每个屏幕自定义应更新哪些列表。
 mixin ItemUpdatable<T extends StatefulWidget> on State<T> {
-  /// The Plex client to use for fetching updated metadata
-  /// Each screen must provide access to their client
+  /// 用于获取更新元数据的 Plex 客户端。
+  /// 每个屏幕必须提供对其客户端的访问。
   PlexClient get client;
 
-  /// Updates a single item in the screen's list(s) after watch state changes
+  /// 在观看状态改变后更新屏幕列表中的单个项目。
   ///
-  /// Fetches the latest metadata with images (including clearLogo) and
-  /// calls [updateItemInLists] to update the appropriate list(s).
+  /// 获取包含图像（包括 clearLogo）的最新元数据，
+  /// 并调用 [updateItemInLists] 来更新相应的列表。
   ///
-  /// If the fetch fails, the error is silently caught and the item will
-  /// be updated on the next full refresh.
+  /// 如果获取失败，错误将被静默捕获，该项目将在下次完整刷新时更新。
   Future<void> updateItem(String ratingKey) async {
     try {
       final updatedMetadata = await client.getMetadataWithImages(ratingKey);
@@ -28,16 +26,16 @@ mixin ItemUpdatable<T extends StatefulWidget> on State<T> {
         });
       }
     } catch (e) {
-      // Silently fail - the item will update on next full refresh
+      // 静默失败 - 该项目将在下次完整刷新时更新
     }
   }
 
-  /// Override this method to specify which list(s) should be updated
+  /// 重写此方法以指定应更新哪些列表。
   ///
-  /// This method is called within [setState], so you should directly
-  /// modify your list(s) without calling setState again.
+  /// 此方法在 [setState] 内部调用，因此你应该直接修改列表，
+  /// 而无需再次调用 setState。
   ///
-  /// Example:
+  /// 示例：
   /// ```dart
   /// @override
   /// void updateItemInLists(String ratingKey, PlexMetadata updatedMetadata) {

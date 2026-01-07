@@ -1,7 +1,7 @@
 import '../utils/formatters.dart';
 
 class PlexFileInfo {
-  // Media level properties
+  // 媒体级别属性
   final String? container;
   final String? videoCodec;
   final String? videoResolution;
@@ -18,11 +18,11 @@ class PlexFileInfo {
   final bool? optimizedForStreaming;
   final bool? has64bitOffsets;
 
-  // Part level properties (file)
+  // 文件级别属性
   final String? filePath;
   final int? fileSize;
 
-  // Stream level properties (video stream details)
+  // 流级别属性（视频流详情）
   final String? colorSpace;
   final String? colorRange;
   final String? colorPrimaries;
@@ -60,15 +60,15 @@ class PlexFileInfo {
     this.audioChannelLayout,
   });
 
-  /// Format file size in human-readable format (GB, MB, KB, bytes)
+  /// 以人类可读的格式（GB, MB, KB, bytes）格式化文件大小
   String get fileSizeFormatted {
-    if (fileSize == null) return 'Unknown';
+    if (fileSize == null) return '未知';
     return ByteFormatter.formatBytes(fileSize!, decimals: 2);
   }
 
-  /// Format duration in HH:MM:SS or MM:SS format
+  /// 以 HH:MM:SS 或 MM:SS 格式格式化时长
   String get durationFormatted {
-    if (duration == null) return 'Unknown';
+    if (duration == null) return '未知';
 
     final seconds = duration! ~/ 1000;
     final hours = seconds ~/ 3600;
@@ -76,55 +76,55 @@ class PlexFileInfo {
     final secs = seconds % 60;
 
     if (hours > 0) {
-      return '${hours}h ${minutes}m ${secs}s';
+      return '${hours}小时 ${minutes}分 ${secs}秒';
     } else {
-      return '${minutes}m ${secs}s';
+      return '${minutes}分 ${secs}秒';
     }
   }
 
-  /// Format bitrate in Mbps or Kbps
+  /// 以 Mbps 或 Kbps 格式化比特率
   String get bitrateFormatted {
-    if (bitrate == null) return 'Unknown';
+    if (bitrate == null) return '未知';
     return ByteFormatter.formatBitrateBps(bitrate!);
   }
 
-  /// Format resolution as widthxheight
+  /// 格式化分辨率为 宽度x高度
   String get resolutionFormatted {
     if (width != null && height != null) {
       return '${width}x$height';
     } else if (videoResolution != null) {
       return videoResolution!;
     }
-    return 'Unknown';
+    return '未知';
   }
 
-  /// Format aspect ratio
+  /// 格式化纵横比
   String get aspectRatioFormatted {
     if (aspectRatio != null) {
       return aspectRatio!.toStringAsFixed(2);
     }
-    return 'Unknown';
+    return '未知';
   }
 
-  /// Format frame rate
+  /// 格式化帧率
   String get frameRateFormatted {
     if (frameRate != null) {
       return '${frameRate!.toStringAsFixed(3)} fps';
     } else if (videoFrameRate != null) {
       return videoFrameRate!;
     }
-    return 'Unknown';
+    return '未知';
   }
 
-  /// Format audio channels (e.g., "2 channels (stereo)")
+  /// 格式化音频通道（例如 "2 channels (stereo)"）
   String get audioChannelsFormatted {
     if (audioChannels != null) {
-      String channelText = '$audioChannels channel${audioChannels! > 1 ? 's' : ''}';
+      String channelText = '$audioChannels 通道';
       if (audioChannelLayout != null) {
         channelText += ' ($audioChannelLayout)';
       }
       return channelText;
     }
-    return 'Unknown';
+    return '未知';
   }
 }

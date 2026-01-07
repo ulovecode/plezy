@@ -4,7 +4,7 @@ import 'dart:math';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 
-/// Service for detecting if the app is running on Android TV
+/// 用于检测应用程序是否在 Android TV 上运行的服务
 class TvDetectionService {
   static TvDetectionService? _instance;
   bool _isTV = false;
@@ -12,7 +12,7 @@ class TvDetectionService {
 
   TvDetectionService._();
 
-  /// Get the singleton instance, initializing if needed
+  /// 获取单例实例，如果需要则进行初始化
   static Future<TvDetectionService> getInstance() async {
     if (_instance == null) {
       _instance = TvDetectionService._();
@@ -27,7 +27,7 @@ class TvDetectionService {
     if (Platform.isAndroid) {
       final deviceInfo = DeviceInfoPlugin();
       final androidInfo = await deviceInfo.androidInfo;
-      // Check for android.software.leanback feature (standard Android TV detection)
+      // 检查 android.software.leanback 功能（标准 Android TV 检测）
       _isTV = androidInfo.systemFeatures.contains('android.software.leanback');
     }
     _initialized = true;
@@ -35,50 +35,50 @@ class TvDetectionService {
 
   bool get isTV => _isTV;
 
-  /// Synchronous access after initialization (returns false if not initialized)
+  /// 初始化后的同步访问（如果未初始化则返回 false）
   static bool isTVSync() => _instance?._isTV ?? false;
 }
 
-/// Utility class for platform detection
+/// 平台检测工具类
 class PlatformDetector {
-  /// Detects if running on Android TV (requires TvDetectionService to be initialized)
+  /// 检测是否在 Android TV 上运行（需要 TvDetectionService 已初始化）
   static bool isTV() {
     return TvDetectionService.isTVSync();
   }
 
-  /// Detects if the app should use side navigation (Desktop or TV)
+  /// 检测应用程序是否应使用侧边导航（桌面或 TV）
   static bool shouldUseSideNavigation(BuildContext context) {
     return isDesktop(context) || isTV();
   }
 
-  /// Detects if running on a mobile platform (iOS or Android)
-  /// Uses Theme for consistent platform detection across the app
+  /// 检测是否在移动平台（iOS 或 Android）上运行
+  /// 使用 Theme 以在整个应用程序中实现一致的平台检测
   static bool isMobile(BuildContext context) {
     final platform = Theme.of(context).platform;
     return platform == TargetPlatform.iOS || platform == TargetPlatform.android;
   }
 
-  /// Detects if running on a desktop platform (Windows, macOS, or Linux)
+  /// 检测是否在桌面平台（Windows、macOS 或 Linux）上运行
   static bool isDesktop(BuildContext context) {
     return !isMobile(context);
   }
 
-  /// Detects if the device is likely a tablet based on screen size
-  /// Uses diagonal screen size to determine if device is a tablet
+  /// 根据屏幕尺寸检测设备是否可能是平板电脑
+  /// 使用对角线屏幕尺寸来确定设备是否为平板电脑
   static bool isTablet(BuildContext context) {
     final data = MediaQuery.of(context);
     final size = data.size;
     final diagonal = sqrt(size.width * size.width + size.height * size.height);
     final devicePixelRatio = data.devicePixelRatio;
 
-    // Convert diagonal from logical pixels to inches (assuming 160 DPI as baseline)
+    // 将对角线从逻辑像素转换为英寸（假设 160 DPI 为基准）
     final diagonalInches = diagonal / (devicePixelRatio * 160 / 2.54);
 
-    // Consider devices with diagonal >= 7 inches as tablets
+    // 将对角线 >= 7 英寸的设备视为平板电脑
     return diagonalInches >= 7.0;
   }
 
-  /// Detects if the device is a phone (mobile but not tablet)
+  /// 检测设备是否为手机（移动平台但非平板电脑）
   static bool isPhone(BuildContext context) {
     return isMobile(context) && !isTablet(context);
   }

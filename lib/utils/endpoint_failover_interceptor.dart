@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../utils/app_logger.dart';
 
-/// Maintains the list of endpoints we can cycle through when one fails.
+/// 维护一个端点列表，当其中一个端点失败时，我们可以循环使用这些端点。
 class EndpointFailoverManager {
   EndpointFailoverManager(List<String> urls) {
     _setEndpoints(urls);
@@ -17,14 +17,14 @@ class EndpointFailoverManager {
 
   bool get hasFallback => _currentIndex < _endpoints.length - 1;
 
-  /// Move to the next endpoint, returning its URL or null if exhausted.
+  /// 移动到下一个端点，返回其 URL，如果已耗尽则返回 null。
   String? moveToNext() {
     if (!hasFallback) return null;
     _currentIndex++;
     return _endpoints[_currentIndex];
   }
 
-  /// Replace the endpoint list and optionally set the active endpoint.
+  /// 替换端点列表，并可选地设置当前活跃端点。
   void reset(List<String> urls, {String? currentBaseUrl}) {
     _setEndpoints(urls);
     if (currentBaseUrl != null) {
@@ -51,7 +51,7 @@ class EndpointFailoverManager {
   }
 }
 
-/// Dio interceptor that retries failed requests on the next available endpoint.
+/// Dio 拦截器，在下一个可用端点上重试失败的请求。
 class EndpointFailoverInterceptor extends Interceptor {
   EndpointFailoverInterceptor({
     required Dio dio,

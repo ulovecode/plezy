@@ -8,81 +8,80 @@ import 'package:gamepads/gamepads.dart';
 
 import '../utils/app_logger.dart';
 
-/// Service that bridges gamepad input to Flutter's focus navigation system.
+/// 将游戏手柄输入桥接到 Flutter 焦点导航系统的服务。
 ///
-/// Listens to gamepad events from the `gamepads` package and translates them
-/// into focus navigation actions and key events that integrate with the
-/// existing keyboard navigation system.
+/// 监听来自 `gamepads` 包的手柄事件，并将其转换为焦点导航操作和键事件，
+/// 与现有的键盘导航系统集成。
 class GamepadService {
   static GamepadService? _instance;
   StreamSubscription<GamepadEvent>? _subscription;
 
-  /// Callback to switch InputModeTracker to keyboard mode.
-  /// Set by InputModeTracker when it initializes.
+  /// 将 InputModeTracker 切换到键盘模式的回调。
+  /// 由 InputModeTracker 在初始化时设置。
   static VoidCallback? onGamepadInput;
 
-  /// Callback for L1 bumper press (previous tab).
-  /// Screens with tabs can listen to this.
+  /// L1 肩键按下的回调 (上一个标签页)。
+  /// 带有标签页的屏幕可以监听此回调。
   static VoidCallback? onL1Pressed;
 
-  /// Callback for R1 bumper press (next tab).
-  /// Screens with tabs can listen to this.
+  /// R1 肩键按下的回调 (下一个标签页)。
+  /// 带有标签页的屏幕可以监听此回调。
   static VoidCallback? onR1Pressed;
 
-  // Deadzone for analog sticks (0.0 to 1.0)
+  // 模拟摇杆的死区 (0.0 到 1.0)
   static const double _stickDeadzone = 0.5;
 
-  // Track D-pad state to avoid repeated navigation events
+  // 跟踪方向键 (D-pad) 状态以避免重复的导航事件
   bool _dpadUp = false;
   bool _dpadDown = false;
   bool _dpadLeft = false;
   bool _dpadRight = false;
 
-  // Track stick state to avoid repeated navigation events
+  // 跟踪摇杆状态以避免重复的导航事件
   bool _leftStickUp = false;
   bool _leftStickDown = false;
   bool _leftStickLeft = false;
   bool _leftStickRight = false;
 
-  // Track button states to prevent repeated events from button holds
+  // 跟踪按钮状态以防止长按按钮产生重复事件
   final Set<String> _pressedButtons = {};
 
   GamepadService._();
 
-  /// Get the singleton instance.
+  /// 获取单例实例。
   static GamepadService get instance {
     _instance ??= GamepadService._();
     return _instance!;
   }
 
-  /// Start listening to gamepad events.
-  /// Only active on desktop platforms (macOS, Windows, Linux).
+  /// 开始监听手柄事件。
+  /// 仅在桌面平台 (macOS, Windows, Linux) 上激活。
   void start() async {
-    // Only enable on desktop platforms
+    // 仅在桌面平台启用
     if (!Platform.isMacOS && !Platform.isWindows && !Platform.isLinux) return;
 
-    appLogger.i('GamepadService: Starting on ${Platform.operatingSystem}');
+    appLogger.i('GamepadService: 正在 ${Platform.operatingSystem} 上启动');
 
-    // List connected gamepads
+    // 列出已连接的手柄
     try {
       final gamepads = await Gamepads.list();
-      appLogger.i('GamepadService: Found ${gamepads.length} gamepad(s)');
+      appLogger.i('GamepadService: 找到 ${gamepads.length} 个手柄');
       for (final gamepad in gamepads) {
         appLogger.i('  - ${gamepad.name} (id: ${gamepad.id})');
       }
     } catch (e) {
-      appLogger.e('GamepadService: Error listing gamepads', error: e);
+      appLogger.e('GamepadService: 列出手柄时出错', error: e);
     }
 
     _subscription?.cancel();
     _subscription = Gamepads.events.listen(
       _handleGamepadEvent,
-      onError: (e) => appLogger.e('GamepadService: Stream error', error: e),
+      onError: (e) => appLogger.e('GamepadService: 流错误', error: e),
     );
-    appLogger.i('GamepadService: Listening for gamepad events');
+    appLogger.i('GamepadService: 正在监听手柄事件');
   }
 
-  /// Stop listening to gamepad events.
+  /// 停止监听手柄事件。
   void stop() {
     _subscription?.cancel();
     _subscription = null;
@@ -92,14 +91,14 @@ class GamepadService {
     final key = event.key.toLowerCase();
     final value = event.value;
 
-    // Switch to keyboard mode on any significant gamepad input
+    // 在任何显著的手柄输入时切换到键盘模式
     if (value.abs() > 0.3) {
       onGamepadInput?.call();
       _setTraditionalFocusHighlight();
       _scheduleFrameIfIdle();
     }
 
-    // Handle D-pad (reported as axes on macOS)
+    // 处理方向键 (macOS 上报告为轴)
     if (_isDpadYAxis(key)) {
       _handleDpadY(value);
       return;
@@ -109,7 +108,7 @@ class GamepadService {
       return;
     }
 
-    // Handle face buttons
+    // 处理功能按钮
     final isPressed = value > 0.5;
     final wasPressed = _pressedButtons.contains(key);
 
@@ -117,12 +116,12 @@ class GamepadService {
       _pressedButtons.add(key);
 
       if (_isButtonA(key)) {
-        // Use enter instead of gameButtonA so it works with Flutter's built-in
-        // widgets (buttons, list tiles, etc.) which listen for enter
+        // 使用 enter 而不是 gameButtonA，以便它能与 Flutter 的内置组件
+        // (按钮、列表项等) 配合使用，这些组件会监听 enter 键
         _simulateKeyPress(LogicalKeyboardKey.enter);
       } else if (_isButtonB(key)) {
-        // Use escape instead of gameButtonB so it works with Flutter's built-in
-        // widgets (bottom sheets, dialogs, menus) which only listen for escape
+        // 使用 escape 而不是 gameButtonB，以便它能与 Flutter 的内置组件
+        // (底部菜单、对话框、菜单) 配合使用，这些组件通常只监听 escape 键
         _simulateKeyPress(LogicalKeyboardKey.escape);
       } else if (_isButtonX(key)) {
         _simulateKeyPress(LogicalKeyboardKey.gameButtonX);
@@ -135,7 +134,7 @@ class GamepadService {
       _pressedButtons.remove(key);
     }
 
-    // Handle left analog stick
+    // 处理左模拟摇杆
     if (_isLeftStickY(key)) {
       _handleLeftStickY(value);
       return;
@@ -147,8 +146,8 @@ class GamepadService {
   }
 
   void _moveFocus(TraversalDirection direction) {
-    // Convert direction to arrow key and simulate a key press
-    // This allows widgets like HubSection that intercept key events to handle navigation
+    // 将方向转换为方向键并模拟按键按下
+    // 这允许像 HubSection 这样拦截键事件的组件来处理导航
     final logicalKey = _directionToKey(direction);
     _simulateKeyPress(logicalKey);
   }
@@ -167,32 +166,31 @@ class GamepadService {
   }
 
   void _simulateKeyPress(LogicalKeyboardKey logicalKey) {
-    // Schedule on next frame to ensure we're on the main thread
+    // 在下一帧调度以确保我们在主线程上
     SchedulerBinding.instance.addPostFrameCallback((_) {
       final focusNode = FocusManager.instance.primaryFocus;
       if (focusNode == null) return;
 
-      // Create a synthetic key down event
+      // 创建一个合成的按键按下事件
       final keyDownEvent = KeyDownEvent(
         physicalKey: _getPhysicalKey(logicalKey),
         logicalKey: logicalKey,
         timeStamp: Duration(milliseconds: DateTime.now().millisecondsSinceEpoch),
       );
 
-      // Dispatch through the focus system by walking up the focus tree
-      // and calling each node's onKeyEvent handler
+      // 通过向上遍历焦点树并调用每个节点的 onKeyEvent 处理程序来分发到焦点系统
       FocusNode? node = focusNode;
       KeyEventResult result = KeyEventResult.ignored;
 
       while (node != null && result != KeyEventResult.handled) {
-        // The Focus widget stores its handler in onKeyEvent
+        // Focus 组件将其处理程序存储在 onKeyEvent 中
         if (node.onKeyEvent != null) {
           result = node.onKeyEvent!(node, keyDownEvent);
         }
         node = node.parent;
       }
 
-      // Send key up event
+      // 发送按键弹起事件
       final keyUpEvent = KeyUpEvent(
         physicalKey: _getPhysicalKey(logicalKey),
         logicalKey: logicalKey,
@@ -231,26 +229,26 @@ class GamepadService {
     return PhysicalKeyboardKey.enter;
   }
 
-  // macOS DualSense key matching
-  // D-pad reports as axes: dpad - xaxis, dpad - yaxis
+  // macOS DualSense 按键匹配
+  // 方向键报告为轴：dpad - xaxis, dpad - yaxis
   bool _isDpadYAxis(String key) => key == 'dpad - yaxis';
   bool _isDpadXAxis(String key) => key == 'dpad - xaxis';
 
-  // Face buttons - macOS uses SF Symbol names for PlayStation controllers
-  bool _isButtonA(String key) => key == 'xmark.circle'; // Cross/X button (bottom)
-  bool _isButtonB(String key) => key == 'circle.circle'; // Circle/O button (right)
-  bool _isButtonX(String key) => key == 'square.circle'; // Square button (left)
+  // 功能按钮 - macOS 为 PlayStation 控制器使用 SF Symbol 名称
+  bool _isButtonA(String key) => key == 'xmark.circle'; // Cross/X 按钮 (底部)
+  bool _isButtonB(String key) => key == 'circle.circle'; // Circle/O 按钮 (右侧)
+  bool _isButtonX(String key) => key == 'square.circle'; // Square 按钮 (左侧)
 
-  // Analog sticks
+  // 模拟摇杆
   bool _isLeftStickX(String key) => key == 'l.joystick - xaxis';
   bool _isLeftStickY(String key) => key == 'l.joystick - yaxis';
 
-  // Bumper buttons
+  // 肩键按钮
   bool _isL1(String key) => key == 'l1.rectangle.roundedbottom';
   bool _isR1(String key) => key == 'r1.rectangle.roundedbottom';
 
-  // D-pad Y axis: -1 = down (visually up on controller), 1 = up (visually down)
-  // Inverted because macOS reports opposite of expected
+  // 方向键 Y 轴：-1 = 下 (手柄上视觉为上)，1 = 上 (视觉为下)
+  // 反转是因为 macOS 报告的与预期相反
   void _handleDpadY(double value) {
     if (value < -0.5 && !_dpadDown) {
       _dpadDown = true;
@@ -266,7 +264,7 @@ class GamepadService {
     }
   }
 
-  // D-pad X axis: -1 = left, 1 = right, 0 = released
+  // 方向键 X 轴：-1 = 左，1 = 右，0 = 释放
   void _handleDpadX(double value) {
     if (value < -0.5 && !_dpadLeft) {
       _dpadLeft = true;
@@ -282,7 +280,7 @@ class GamepadService {
     }
   }
 
-  // Left stick Y axis - inverted like D-pad
+  // 左摇杆 Y 轴 - 与方向键一样反转
   void _handleLeftStickY(double value) {
     if (value < -_stickDeadzone && !_leftStickDown) {
       _leftStickDown = true;
@@ -313,17 +311,16 @@ class GamepadService {
     }
   }
 
-  // Ensure Material uses traditional (keyboard) focus highlights when navigating
-  // via gamepad. Synthetic key events we dispatch below don't go through the
-  // platform key pipeline, so Flutter won't automatically flip highlight mode.
+  // 确保 Material 在通过手柄导航时使用传统的 (键盘) 焦点高亮。
+  // 我们下面分发的合成键事件不会通过平台按键管道，因此 Flutter 不会自动切换高亮模式。
   void _setTraditionalFocusHighlight() {
     if (FocusManager.instance.highlightStrategy != FocusHighlightStrategy.alwaysTraditional) {
       FocusManager.instance.highlightStrategy = FocusHighlightStrategy.alwaysTraditional;
     }
   }
 
-  // Force a frame when the engine is idle so focus visuals update immediately
-  // on gamepad input (desktop may not wake up without mouse/keyboard activity).
+  // 在手柄输入时，如果引擎处于空闲状态，则强制执行一帧，以便焦点视觉效果立即更新
+  // (桌面端在没有鼠标/键盘活动的情况下可能不会唤醒)。
   void _scheduleFrameIfIdle() {
     final scheduler = SchedulerBinding.instance;
     if (scheduler.schedulerPhase == SchedulerPhase.idle) {

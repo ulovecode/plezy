@@ -1,10 +1,10 @@
 class LogRedactionManager {
-  // Size limits for bounded sets (FIFO eviction when exceeded)
+  // 受限集合的大小限制（超过时进行 FIFO 淘汰）
   static const int _maxTokens = 50;
   static const int _maxUrls = 20;
   static const int _maxCustomValues = 50;
 
-  // Use LinkedHashSet for FIFO ordering
+  // 使用 LinkedHashSet 保持 FIFO 顺序
   static final Set<String> _tokens = <String>{};
   static final Set<String> _urls = <String>{};
   static final Set<String> _customValues = <String>{};
@@ -12,17 +12,17 @@ class LogRedactionManager {
   static final RegExp _ipv4Pattern = RegExp(r'\b(\d{1,3})([.-])(\d{1,3})\2(\d{1,3})\2(\d{1,3})\b');
   static final RegExp _ipv4HostPattern = RegExp(r'^\d{1,3}([.-]\d{1,3}){3}$');
 
-  // Combined regex for single-pass redaction (rebuilt on set changes)
+  // 用于单次脱敏的组合正则表达式（在集合更改时重建）
   static RegExp? _combinedPattern;
 
-  /// Register a server access token or Plex.tv token for redaction.
+  /// 注册服务器访问令牌或 Plex.tv 令牌以进行脱敏。
   static void registerToken(String? token) {
     final normalized = _normalize(token);
     if (normalized == null) return;
 
     _addWithLimit(_tokens, normalized, _maxTokens);
 
-    // Tokens often appear URL encoded in query params.
+    // 令牌经常在查询参数中以 URL 编码形式出现。
     final encoded = Uri.encodeQueryComponent(normalized);
     if (encoded != normalized) {
       _addWithLimit(_tokens, encoded, _maxTokens);
@@ -31,7 +31,7 @@ class LogRedactionManager {
     _rebuildCombinedPattern();
   }
 
-  /// Register the server/base URL currently in use.
+  /// 注册当前使用的服务器/基础 URL。
   static void registerServerUrl(String? url) {
     final normalized = _normalize(url);
     if (normalized == null) return;
@@ -39,7 +39,7 @@ class LogRedactionManager {
     final uri = Uri.tryParse(normalized);
     final host = uri?.host;
     if (host != null && host.isNotEmpty && _isIpv4Like(host)) {
-      // Do not register full IP-based URLs; regex redaction handles them.
+      // 不要注册完整的基于 IP 的 URL；正则表达式脱敏会处理它们。
       return;
     }
 
@@ -54,7 +54,7 @@ class LogRedactionManager {
       _addWithLimit(_urls, '$strippedSlash/', _maxUrls);
     }
 
-    // Capture origin and host-level strings as well to cover most cases.
+    // 同时捕获源 (origin) 和主机级别的字符串，以覆盖大多数情况。
     if (uri != null && uri.host.isNotEmpty) {
       final origin = '${uri.scheme.isEmpty ? 'https' : uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}';
       _addWithLimit(_urls, origin, _maxUrls);
@@ -66,7 +66,7 @@ class LogRedactionManager {
     _rebuildCombinedPattern();
   }
 
-  /// Register other sensitive values that need redaction.
+  /// 注册其他需要脱敏的敏感值。
   static void registerCustomValue(String? value) {
     final normalized = _normalize(value);
     if (normalized == null) return;
@@ -74,7 +74,7 @@ class LogRedactionManager {
     _rebuildCombinedPattern();
   }
 
-  /// Reset any tracked sensitive values (e.g., on logout).
+  /// 重置所有已跟踪的敏感值（例如在注销时）。
   static void clearTrackedValues() {
     _tokens.clear();
     _urls.clear();
@@ -82,15 +82,15 @@ class LogRedactionManager {
     _combinedPattern = null;
   }
 
-  /// Redact known sensitive values from the provided message.
+  /// 从提供的消息中脱敏已知的敏感值。
   static String redact(String message) {
-    // Pass 1: IPv4 addresses (regex pattern)
+    // 第一步：IPv4 地址（正则表达式模式）
     var redacted = message.replaceAllMapped(
       _ipv4Pattern,
       (match) => _maskIpv4(match.group(1)!, match.group(2)!, match.group(5)!),
     );
 
-    // Pass 2: All tracked values in single pass
+    // 第二步：单次遍历脱敏所有已跟踪的值
     if (_combinedPattern != null) {
       redacted = redacted.replaceAllMapped(_combinedPattern!, (match) {
         final value = match.group(0)!;
@@ -103,7 +103,7 @@ class LogRedactionManager {
     return redacted;
   }
 
-  /// Rebuild the combined regex pattern from all tracked values.
+  /// 根据所有已跟踪的值重建组合正则表达式模式。
   static void _rebuildCombinedPattern() {
     final allLiterals = [
       ..._tokens.map(RegExp.escape),
@@ -116,16 +116,16 @@ class LogRedactionManager {
       return;
     }
 
-    // Sort by length descending so longer matches are preferred
+    // 按长度降序排序，以便优先匹配较长的字符串
     allLiterals.sort((a, b) => b.length.compareTo(a.length));
     _combinedPattern = RegExp(allLiterals.join('|'));
   }
 
-  /// Add value to set with FIFO eviction if limit exceeded.
+  /// 将值添加到集合中，如果超过限制则进行 FIFO 淘汰。
   static void _addWithLimit(Set<String> set, String value, int maxSize) {
-    if (set.contains(value)) return; // Already tracked
+    if (set.contains(value)) return; // 已跟踪
 
-    // Evict oldest entries if at capacity
+    // 如果容量已满，则淘汰最旧的条目
     while (set.length >= maxSize) {
       set.remove(set.first);
     }

@@ -1,4 +1,4 @@
-/// Represents a single MPV configuration entry
+/// 表示单个 MPV 配置项
 class MpvConfigEntry {
   final String key;
   final String value;
@@ -21,7 +21,7 @@ class MpvConfigEntry {
   }
 }
 
-/// Represents a saved preset of MPV configurations
+/// 表示已保存的 MPV 配置预设
 class MpvPreset {
   final String name;
   final List<MpvConfigEntry> entries;

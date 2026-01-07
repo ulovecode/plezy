@@ -2,22 +2,22 @@ mixin Refreshable {
   void refresh();
 }
 
-/// Mixin for screens that support full refresh (clearing all cached data)
+/// 支持完整刷新（清除所有缓存数据）的屏幕所使用的混入（Mixin）
 mixin FullRefreshable {
   void fullRefresh();
 }
 
-/// Mixin for screens with focusable tab content
+/// 具有可聚焦标签页内容的屏幕所使用的混入（Mixin）
 mixin FocusableTab {
   void focusActiveTabIfReady();
 }
 
-/// Mixin for screens with focusable search input
+/// 具有可聚焦搜索输入框的屏幕所使用的混入（Mixin）
 mixin SearchInputFocusable {
   void focusSearchInput();
 }
 
-/// Mixin for screens that can load a specific library by key
+/// 可以根据 Key 加载特定库的屏幕所使用的混入（Mixin）
 mixin LibraryLoadable {
   void loadLibraryByKey(String libraryGlobalKey);
 }

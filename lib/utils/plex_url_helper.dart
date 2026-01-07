@@ -1,19 +1,18 @@
-/// Extension methods for appending Plex authentication tokens to URLs.
+/// 为 URL 追加 Plex 身份验证令牌的扩展方法。
 extension PlexUrlExtension on String {
-  /// Appends a Plex authentication token to this URL string.
+  /// 向此 URL 字符串追加 Plex 身份验证令牌。
   ///
-  /// Automatically determines whether to use '?' or '&' as the separator
-  /// based on whether the URL already contains query parameters.
+  /// 根据 URL 是否已包含查询参数，自动确定使用 '?' 还是 '&' 作为分隔符。
   ///
-  /// If [token] is null or empty, returns the URL unchanged.
+  /// 如果 [token] 为 null 或为空，则返回原 URL。
   ///
-  /// Example:
+  /// 示例：
   /// ```dart
   /// final url = '/library/metadata/123'.withPlexToken('abc123');
-  /// // Result: '/library/metadata/123?X-Plex-Token=abc123'
+  /// // 结果：'/library/metadata/123?X-Plex-Token=abc123'
   ///
   /// final urlWithParams = '/library/metadata/123?type=1'.withPlexToken('abc123');
-  /// // Result: '/library/metadata/123?type=1&X-Plex-Token=abc123'
+  /// // 结果：'/library/metadata/123?type=1&X-Plex-Token=abc123'
   /// ```
   String withPlexToken(String? token) {
     if (token == null || token.isEmpty) return this;
@@ -21,14 +20,14 @@ extension PlexUrlExtension on String {
     return '$this${separator}X-Plex-Token=$token';
   }
 
-  /// Appends a base URL and Plex authentication token to this path string.
+  /// 向此路径字符串追加基础 URL 和 Plex 身份验证令牌。
   ///
-  /// If [token] is null or empty, returns the URL without a token parameter.
+  /// 如果 [token] 为 null 或为空，则返回不带令牌参数的 URL。
   ///
-  /// Example:
+  /// 示例：
   /// ```dart
   /// final fullUrl = '/library/metadata/123'.toPlexUrl('http://server:32400', 'abc123');
-  /// // Result: 'http://server:32400/library/metadata/123?X-Plex-Token=abc123'
+  /// // 结果：'http://server:32400/library/metadata/123?X-Plex-Token=abc123'
   /// ```
   String toPlexUrl(String baseUrl, String? token) {
     return '$baseUrl$this'.withPlexToken(token);

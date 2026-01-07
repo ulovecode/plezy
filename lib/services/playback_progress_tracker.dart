@@ -7,33 +7,33 @@ import 'offline_watch_sync_service.dart';
 import '../models/plex_metadata.dart';
 import '../utils/app_logger.dart';
 
-/// Tracks playback progress and reports it to the Plex server.
+/// 跟踪播放进度并将其报告给 Plex 服务器。
 ///
-/// Handles:
-/// - Periodic timeline updates during playback (online) or queuing (offline)
-/// - Resume position tracking
-/// - State change reporting (playing, paused, stopped)
-/// - Offline progress queuing for later sync
+/// 处理：
+/// - 播放期间的定期时间线更新 (在线) 或排队 (离线)
+/// - 续播位置跟踪
+/// - 状态更改报告 (播放中、已暂停、已停止)
+/// - 用于以后同步的离线进度排队
 class PlaybackProgressTracker {
-  /// Plex client for online progress updates (null when offline)
+  /// 用于在线进度更新的 Plex 客户端 (离线时为 null)
   final PlexClient? client;
 
-  /// Metadata of the media being played
+  /// 正在播放的媒体元数据
   final PlexMetadata metadata;
 
-  /// Video player instance
+  /// 视频播放器实例
   final Player player;
 
-  /// Whether playback is in offline mode
+  /// 是否处于离线模式播放
   final bool isOffline;
 
-  /// Service for queuing offline progress updates
+  /// 用于排队离线进度更新的服务
   final OfflineWatchSyncService? offlineWatchService;
 
-  /// Timer for periodic progress updates
+  /// 定期进度更新的定时器
   Timer? _progressTimer;
 
-  /// Update interval (default: 10 seconds)
+  /// 更新间隔 (默认: 10 秒)
   final Duration updateInterval;
 
   PlaybackProgressTracker({
@@ -43,20 +43,20 @@ class PlaybackProgressTracker {
     this.isOffline = false,
     this.offlineWatchService,
     this.updateInterval = const Duration(seconds: 10),
-  }) : assert(!isOffline || offlineWatchService != null, 'offlineWatchService is required when isOffline is true'),
-       assert(isOffline || client != null, 'client is required when isOffline is false');
+  }) : assert(!isOffline || offlineWatchService != null, '离线模式下需要提供 offlineWatchService'),
+       assert(isOffline || client != null, '在线模式下需要提供 client');
 
-  /// Start tracking playback progress
+  /// 开始跟踪播放进度
   ///
-  /// Begins periodic timeline updates to the Plex server (online)
-  /// or queuing progress updates locally (offline).
+  /// 开始向 Plex 服务器进行定期时间线更新 (在线)
+  /// 或在本地排队进度更新 (离线)。
   void startTracking() {
     if (_progressTimer != null) {
-      appLogger.w('Progress tracking already started');
+      appLogger.w('进度跟踪已启动');
       return;
     }
 
-    // Send initial progress immediately (don't wait for first timer tick)
+    // 立即发送初始进度 (不等待第一次定时器触发)
     if (player.state.playing) {
       _sendProgress('playing');
     }
@@ -67,21 +67,21 @@ class PlaybackProgressTracker {
       }
     });
 
-    appLogger.d('Started progress tracking (interval: ${updateInterval.inSeconds}s, offline: $isOffline)');
+    appLogger.d('已启动进度跟踪 (间隔: ${updateInterval.inSeconds}s, 离线: $isOffline)');
   }
 
-  /// Stop tracking playback progress
+  /// 停止跟踪播放进度
   ///
-  /// Cancels the periodic timer.
+  /// 取消定期定时器。
   void stopTracking() {
     _progressTimer?.cancel();
     _progressTimer = null;
-    appLogger.d('Stopped progress tracking');
+    appLogger.d('已停止进度跟踪');
   }
 
-  /// Send progress update to Plex server or queue locally
+  /// 向 Plex 服务器发送进度更新或在本地排队
   ///
-  /// [state] can be 'playing', 'paused', or 'stopped'
+  /// [state] 可以是 'playing' (播放中), 'paused' (已暂停), 或 'stopped' (已停止)
   Future<void> sendProgress(String state) async {
     await _sendProgress(state);
   }
@@ -91,24 +91,24 @@ class PlaybackProgressTracker {
       final position = player.state.position;
       final duration = player.state.duration;
 
-      // Don't send progress if no duration (not ready)
+      // 如果没有时长 (尚未就绪)，则不发送进度
       if (duration.inMilliseconds == 0) {
         return;
       }
 
       if (isOffline) {
-        // Queue progress update for later sync
+        // 排队进度更新以便以后同步
         await _sendOfflineProgress(position, duration);
       } else {
-        // Send progress to server immediately
+        // 立即向服务器发送进度
         await _sendOnlineProgress(state, position, duration);
       }
     } catch (e) {
-      appLogger.d('Failed to send progress update (non-critical)', error: e);
+      appLogger.d('发送进度更新失败 (非关键)', error: e);
     }
   }
 
-  /// Send progress update to Plex server (online mode)
+  /// 向 Plex 服务器发送进度更新 (在线模式)
   Future<void> _sendOnlineProgress(String state, Duration position, Duration duration) async {
     await client!.updateProgress(
       metadata.ratingKey,
@@ -117,14 +117,14 @@ class PlaybackProgressTracker {
       duration: duration.inMilliseconds,
     );
 
-    appLogger.d('Progress update sent: $state at ${position.inSeconds}s / ${duration.inSeconds}s');
+    appLogger.d('进度更新已发送: $state 位于 ${position.inSeconds}s / ${duration.inSeconds}s');
   }
 
-  /// Queue progress update locally (offline mode)
+  /// 在本地排队进度更新 (离线模式)
   Future<void> _sendOfflineProgress(Duration position, Duration duration) async {
     final serverId = metadata.serverId;
     if (serverId == null) {
-      appLogger.w('Cannot queue offline progress: serverId is null');
+      appLogger.w('无法排队离线进度: serverId 为 null');
       return;
     }
 
@@ -137,11 +137,11 @@ class PlaybackProgressTracker {
 
     final percent = (position.inMilliseconds / duration.inMilliseconds * 100);
     appLogger.d(
-      'Offline progress queued: ${position.inSeconds}s / ${duration.inSeconds}s (${percent.toStringAsFixed(1)}%)',
+      '离线进度已排队: ${position.inSeconds}s / ${duration.inSeconds}s (${percent.toStringAsFixed(1)}%)',
     );
   }
 
-  /// Dispose resources
+  /// 释放资源
   void dispose() {
     stopTracking();
   }

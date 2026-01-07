@@ -7,13 +7,13 @@ import 'multi_server_manager.dart';
 import 'plex_api_cache.dart';
 import 'plex_client.dart';
 
-/// Service for managing offline watch progress and syncing to Plex servers.
+/// 用于管理离线观看进度并同步到 Plex 服务器的服务。
 ///
-/// Handles:
-/// - Queuing progress updates when offline
-/// - Queuing manual watch/unwatch actions
-/// - Auto-marking items as watched at 90% threshold
-/// - Syncing queued actions when connectivity is restored
+/// 处理：
+/// - 离线时排队进度更新
+/// - 排队手动标记已看/未看操作
+/// - 进度达到 90% 阈值时自动标记为已看
+/// - 恢复连接时同步排队的操作
 class OfflineWatchSyncService extends ChangeNotifier {
   final AppDatabase _database;
   final MultiServerManager _serverManager;
@@ -25,28 +25,28 @@ class OfflineWatchSyncService extends ChangeNotifier {
   DateTime? _lastSyncTime;
   bool _hasPerformedStartupSync = false;
 
-  /// Callback to refresh download provider metadata after sync
+  /// 同步后刷新下载提供者元数据的回调
   VoidCallback? onWatchStatesRefreshed;
 
-  /// Watch threshold - mark as watched when progress exceeds this percentage
+  /// 观看阈值 - 当进度超过此百分比时标记为已看
   static const double watchedThreshold = 0.90;
 
-  /// Minimum interval between syncs (10 minutes)
+  /// 同步之间的最小间隔 (10 分钟)
   static const Duration minSyncInterval = Duration(minutes: 10);
 
-  /// Maximum sync attempts before giving up on an item
+  /// 放弃同步项目前的最大尝试次数
   static const int maxSyncAttempts = 5;
 
   OfflineWatchSyncService({required AppDatabase database, required MultiServerManager serverManager})
     : _database = database,
       _serverManager = serverManager;
 
-  /// Whether a sync is currently in progress
+  /// 是否正在进行同步
   bool get isSyncing => _isSyncing;
 
-  /// Start monitoring for connectivity changes to auto-sync
+  /// 开始监控连接变化以进行自动同步
   void startConnectivityMonitoring(OfflineModeProvider offlineModeProvider) {
-    // Remove previous listener if any
+    // 移除之前的监听器（如果有）
     if (_offlineModeProvider != null && _offlineModeListener != null) {
       _offlineModeProvider!.removeListener(_offlineModeListener!);
     }
@@ -54,52 +54,52 @@ class OfflineWatchSyncService extends ChangeNotifier {
     _offlineModeProvider = offlineModeProvider;
     _offlineModeListener = () {
       if (!offlineModeProvider.isOffline) {
-        // We just came online - trigger bidirectional sync
-        appLogger.i('Connectivity restored - starting bidirectional watch sync');
+        // 刚上线 - 触发双向同步
+        appLogger.i('连接已恢复 - 开始双向观看同步');
         _performBidirectionalSync();
       }
     };
 
     offlineModeProvider.addListener(_offlineModeListener!);
 
-    // Don't sync on startup - servers aren't connected yet.
-    // Sync will happen when:
-    // - Connectivity is restored (listener triggers)
-    // - App resumes from background (onAppResumed)
+    // 不要在启动时同步 - 服务器尚未连接。
+    // 同步将在以下情况发生：
+    // - 连接恢复 (监听器触发)
+    // - 应用从后台恢复 (onAppResumed)
   }
 
-  /// Perform bidirectional sync: push local changes, then pull server states.
+  /// 执行双向同步：推送本地更改，然后拉取服务器状态。
   ///
-  /// Push always happens immediately. Pull respects [minSyncInterval] unless [force] is true.
+  /// 推送总是立即发生。拉取遵循 [minSyncInterval]，除非 [force] 为 true。
   Future<void> _performBidirectionalSync({bool force = false}) async {
-    // Prevent overlapping bidirectional syncs
+    // 防止重叠的双向同步
     if (_isBidirectionalSyncing) {
-      appLogger.d('Bidirectional sync already in progress, skipping');
+      appLogger.d('双向同步已在进行中，跳过');
       return;
     }
 
     if (_serverManager.onlineClients.isEmpty) {
-      appLogger.d('Skipping watch sync - no connected servers available yet');
+      appLogger.d('跳过观看同步 - 尚无连接的服务器可用');
       return;
     }
 
     _isBidirectionalSyncing = true;
     try {
-      // Always push local changes to server (never throttle outbound sync)
+      // 始终将本地更改推送到服务器 (从不节流出站同步)
       await syncPendingItems();
 
-      // Only throttle the pull from server
+      // 仅节流从服务器拉取的操作
       if (!force && _lastSyncTime != null) {
         final elapsed = DateTime.now().difference(_lastSyncTime!);
         if (elapsed < minSyncInterval) {
           appLogger.d(
-            'Skipping server pull - last sync was ${elapsed.inMinutes}m ago (min: ${minSyncInterval.inMinutes}m)',
+            '跳过服务器拉取 - 上次同步是在 ${elapsed.inMinutes} 分钟前 (最小间隔: ${minSyncInterval.inMinutes} 分钟)',
           );
           return;
         }
       }
 
-      // Pull latest states from server
+      // 从服务器拉取最新状态
       await syncWatchStatesFromServer();
       _lastSyncTime = DateTime.now();
     } finally {
@@ -107,32 +107,32 @@ class OfflineWatchSyncService extends ChangeNotifier {
     }
   }
 
-  /// Called when app becomes active - syncs if interval has passed.
+  /// 当应用变为活跃状态时调用 - 如果间隔已过则进行同步。
   void onAppResumed() {
     if (_offlineModeProvider?.isOffline != true) {
-      appLogger.d('App resumed - checking if sync needed');
+      appLogger.d('应用已恢复 - 检查是否需要同步');
       _performBidirectionalSync();
     }
   }
 
-  /// Called when servers connect on app startup.
+  /// 在应用启动服务器连接时调用。
   ///
-  /// Triggers the initial sync now that PlexClients are available.
-  /// Only runs once per app session.
+  /// 既然 PlexClient 已可用，触发初始同步。
+  /// 每个应用会话仅运行一次。
   void onServersConnected() {
     if (_hasPerformedStartupSync) return;
     _hasPerformedStartupSync = true;
 
     if (_offlineModeProvider?.isOffline != true) {
-      appLogger.i('Servers connected - performing startup sync');
+      appLogger.i('服务器已连接 - 执行启动同步');
       _performBidirectionalSync();
     }
   }
 
-  /// Queue a progress update for later sync.
+  /// 排队一个进度更新以便稍后同步。
   ///
-  /// This is called during offline playback to track the watch position.
-  /// If progress exceeds 90%, shouldMarkWatched is set to true.
+  /// 这在离线播放期间调用以跟踪观看位置。
+  /// 如果进度超过 90%，shouldMarkWatched 将设置为 true。
   Future<void> queueProgressUpdate({
     required String serverId,
     required String ratingKey,
@@ -150,25 +150,25 @@ class OfflineWatchSyncService extends ChangeNotifier {
     );
 
     appLogger.d(
-      'Queued offline progress: $serverId:$ratingKey at ${(viewOffset / 1000).toStringAsFixed(0)}s / ${(duration / 1000).toStringAsFixed(0)}s (${((viewOffset / duration) * 100).toStringAsFixed(1)}%)',
+      '已排队离线进度: $serverId:$ratingKey 位置为 ${(viewOffset / 1000).toStringAsFixed(0)}s / ${(duration / 1000).toStringAsFixed(0)}s (${((viewOffset / duration) * 100).toStringAsFixed(1)}%)',
     );
 
     notifyListeners();
   }
 
-  /// Queue a manual "mark as watched" action.
+  /// 排队一个手动 "标记为已看" 操作。
   ///
-  /// Removes any conflicting actions for the same item.
+  /// 移除同一项目的任何冲突操作。
   Future<void> queueMarkWatched({required String serverId, required String ratingKey}) =>
       _queueWatchStatusAction(serverId: serverId, ratingKey: ratingKey, actionType: 'watched');
 
-  /// Queue a manual "mark as unwatched" action.
+  /// 排队一个手动 "标记为未看" 操作。
   ///
-  /// Removes any conflicting actions for the same item.
+  /// 移除同一项目的任何冲突操作。
   Future<void> queueMarkUnwatched({required String serverId, required String ratingKey}) =>
       _queueWatchStatusAction(serverId: serverId, ratingKey: ratingKey, actionType: 'unwatched');
 
-  /// Internal helper to queue watch/unwatch actions.
+  /// 内部辅助方法，用于排队已看/未看操作。
   Future<void> _queueWatchStatusAction({
     required String serverId,
     required String ratingKey,
@@ -176,22 +176,22 @@ class OfflineWatchSyncService extends ChangeNotifier {
   }) async {
     await _database.insertWatchAction(serverId: serverId, ratingKey: ratingKey, actionType: actionType);
 
-    appLogger.d('Queued offline mark $actionType: $serverId:$ratingKey');
+    appLogger.d('已排队离线标记 $actionType: $serverId:$ratingKey');
     notifyListeners();
   }
 
-  /// Check if an item should be considered watched based on progress percentage.
+  /// 根据进度百分比检查项目是否应被视为已看。
   bool isWatchedByProgress(int viewOffset, int duration) {
     if (duration == 0) return false;
     return (viewOffset / duration) >= watchedThreshold;
   }
 
-  /// Get the local watch status for a media item.
+  /// 获取媒体项目的本地观看状态。
   ///
-  /// Returns:
-  /// - `true` if item was marked as watched locally or progress >= 90%
-  /// - `false` if item was marked as unwatched locally
-  /// - `null` if no local action exists (use cached server data)
+  /// 返回：
+  /// - `true` 如果项目在本地被标记为已看或进度 >= 90%
+  /// - `false` 如果项目在本地被标记为未看
+  /// - `null` 如果不存在本地操作 (使用缓存的服务器数据)
   Future<bool?> getLocalWatchStatus(String globalKey) async {
     final action = await _database.getLatestWatchAction(globalKey);
     if (action == null) return null;
@@ -202,17 +202,17 @@ class OfflineWatchSyncService extends ChangeNotifier {
       case 'unwatched':
         return false;
       case 'progress':
-        // Check if progress exceeds threshold
+        // 检查进度是否超过阈值
         return action.shouldMarkWatched;
       default:
         return null;
     }
   }
 
-  /// Get local watch statuses for multiple items in a single database query.
+  /// 在单个数据库查询中获取多个项目的本地观看状态。
   ///
-  /// Returns a map of globalKey -> watch status (true/false/null).
-  /// More efficient than calling getLocalWatchStatus multiple times.
+  /// 返回 globalKey -> 观看状态 (true/false/null) 的映射。
+  /// 比多次调用 getLocalWatchStatus 更高效。
   Future<Map<String, bool?>> getLocalWatchStatusesBatched(Set<String> globalKeys) async {
     if (globalKeys.isEmpty) return {};
 
@@ -241,14 +241,14 @@ class OfflineWatchSyncService extends ChangeNotifier {
     return result;
   }
 
-  /// Get the local view offset (resume position) for a media item.
+  /// 获取媒体项目的本地观看偏移量 (续播位置)。
   ///
-  /// Returns the locally tracked position, or null if none exists.
+  /// 返回本地跟踪的位置，如果不存在则返回 null。
   Future<int?> getLocalViewOffset(String globalKey) async {
     final action = await _database.getLatestWatchAction(globalKey);
     if (action == null) return null;
 
-    // Only return offset for progress actions
+    // 仅为进度操作返回偏移量
     if (action.actionType == 'progress') {
       return action.viewOffset;
     }
@@ -256,18 +256,18 @@ class OfflineWatchSyncService extends ChangeNotifier {
     return null;
   }
 
-  /// Get count of pending sync items.
+  /// 获取待同步项目的数量。
   Future<int> getPendingSyncCount() async {
     return _database.getPendingSyncCount();
   }
 
-  /// Sync all pending items to their respective servers.
+  /// 同步所有待处理项目到各自的服务器。
   ///
-  /// Called automatically when connectivity is restored, or manually.
-  /// Actions are batched by server to reduce connectivity lookups.
+  /// 在连接恢复时自动调用，或手动调用。
+  /// 按服务器分批处理操作以减少连接查找。
   Future<void> syncPendingItems() async {
     if (_isSyncing) {
-      appLogger.d('Sync already in progress, skipping');
+      appLogger.d('同步已在进行中，跳过');
       return;
     }
 
@@ -278,29 +278,29 @@ class OfflineWatchSyncService extends ChangeNotifier {
       final pendingActions = await _database.getPendingWatchActions();
 
       if (pendingActions.isEmpty) {
-        appLogger.d('No pending watch actions to sync');
+        appLogger.d('没有待同步的观看操作');
         return;
       }
 
-      appLogger.i('Syncing ${pendingActions.length} pending watch actions');
+      appLogger.i('正在同步 ${pendingActions.length} 个待处理的观看操作');
 
-      // First pass: handle retry limit exceeded and group by server
+      // 第一步：处理超过重试限制的项目并按服务器分组
       final actionsByServer = <String, List<OfflineWatchProgressItem>>{};
 
       for (final action in pendingActions) {
-        // Delete items that have exceeded retry limit
+        // 删除已超过重试限制的项目
         if (action.syncAttempts >= maxSyncAttempts) {
           appLogger.w(
-            'Deleting action ${action.id} - exceeded retry limit '
-            '(${action.syncAttempts} attempts). Last error: ${action.lastError}',
+            '正在删除操作 ${action.id} - 已超过重试限制 '
+            '(${action.syncAttempts} 次尝试)。最后错误: ${action.lastError}',
           );
           await _database.deleteWatchAction(action.id);
           continue;
         }
 
-        // Check if server still exists
+        // 检查服务器是否仍然存在
         if (_serverManager.getServer(action.serverId) == null) {
-          appLogger.w('Deleting action ${action.id} - server ${action.serverId} no longer exists');
+          appLogger.w('正在删除操作 ${action.id} - 服务器 ${action.serverId} 不再存在');
           await _database.deleteWatchAction(action.id);
           continue;
         }
@@ -308,7 +308,7 @@ class OfflineWatchSyncService extends ChangeNotifier {
         actionsByServer.putIfAbsent(action.serverId, () => []).add(action);
       }
 
-      // Second pass: process each server's actions with single connectivity check
+      // 第二步：通过单个连接检查处理每个服务器的操作
       for (final entry in actionsByServer.entries) {
         final serverId = entry.key;
         final actions = entry.value;
@@ -317,23 +317,23 @@ class OfflineWatchSyncService extends ChangeNotifier {
           for (final action in actions) {
             try {
               await _syncAction(client, action);
-              // Success - delete the action from queue
+              // 成功 - 从队列中删除该操作
               await _database.deleteWatchAction(action.id);
-              appLogger.d('Successfully synced action ${action.id}: ${action.actionType} for ${action.ratingKey}');
+              appLogger.d('成功同步操作 ${action.id}: ${action.actionType} 用于 ${action.ratingKey}');
             } catch (e) {
-              appLogger.w('Failed to sync action ${action.id}: $e');
+              appLogger.w('同步操作 ${action.id} 失败: $e');
               await _database.updateSyncAttempt(action.id, e.toString());
             }
           }
         });
 
-        // If _withOnlineClient returned null (server offline), mark actions for retry
+        // 如果 _withOnlineClient 返回 null (服务器离线)，则将操作标记为重试
         if (_serverManager.getClient(serverId) == null || !_serverManager.isServerOnline(serverId)) {
           for (final action in actions) {
-            // Only update if we haven't already processed it
+            // 仅在尚未处理时更新
             final stillPending = await _database.getLatestWatchAction('${action.serverId}:${action.ratingKey}');
             if (stillPending != null && stillPending.id == action.id) {
-              await _database.updateSyncAttempt(action.id, 'Server not available');
+              await _database.updateSyncAttempt(action.id, '服务器不可用');
             }
           }
         }
@@ -344,26 +344,26 @@ class OfflineWatchSyncService extends ChangeNotifier {
     }
   }
 
-  /// Execute a callback with an online client for the given server.
+  /// 使用给定服务器的在线客户端执行回调。
   ///
-  /// Returns null if no client available or server is offline.
-  /// The callback receives the PlexClient and should return the result.
+  /// 如果没有可用的客户端或服务器离线，则返回 null。
+  /// 回调接收 PlexClient 并应返回结果。
   Future<T?> _withOnlineClient<T>(String serverId, Future<T> Function(PlexClient client) callback) async {
     final client = _serverManager.getClient(serverId);
     if (client == null) {
-      appLogger.d('No client for server $serverId, skipping');
+      appLogger.d('没有服务器 $serverId 的客户端，跳过');
       return null;
     }
 
     if (!_serverManager.isServerOnline(serverId)) {
-      appLogger.d('Server $serverId is offline, skipping');
+      appLogger.d('服务器 $serverId 离线，跳过');
       return null;
     }
 
     return callback(client);
   }
 
-  /// Sync a single action to the server.
+  /// 将单个操作同步到服务器。
   Future<void> _syncAction(PlexClient client, OfflineWatchProgressItem action) async {
     switch (action.actionType) {
       case 'watched':
@@ -375,17 +375,17 @@ class OfflineWatchSyncService extends ChangeNotifier {
         break;
 
       case 'progress':
-        // First, update the timeline with current position
+        // 首先，使用当前位置更新时间线
         if (action.viewOffset != null && action.duration != null) {
           await client.updateProgress(
             action.ratingKey,
             time: action.viewOffset!,
-            state: 'stopped', // Use 'stopped' since we're syncing after the fact
+            state: 'stopped', // 使用 'stopped'，因为我们是在事后同步
             duration: action.duration,
           );
         }
 
-        // If progress exceeded threshold, also mark as watched
+        // 如果进度超过阈值，也标记为已看
         if (action.shouldMarkWatched) {
           await client.markAsWatched(action.ratingKey);
         }
@@ -393,40 +393,39 @@ class OfflineWatchSyncService extends ChangeNotifier {
     }
   }
 
-  /// Fetch latest watch states from server and update local cache.
+  /// 从服务器获取最新的观看状态并更新本地缓存。
   ///
-  /// Called when coming online or on app startup to pull any watch state
-  /// changes made on other devices.
+  /// 在上线或应用启动时调用，以拉取在其他设备上进行的任何观看状态更改。
   ///
-  /// Optimized to fetch episodes by season (one API call per season)
-  /// instead of one API call per episode.
+  /// 经过优化，按季获取剧集 (每季一次 API 调用)，
+  /// 而不是每集进行一次 API 调用。
   Future<void> syncWatchStatesFromServer() async {
     try {
-      // Get all downloaded items from database
+      // 从数据库获取所有已下载的项目
       final downloadedItems = await _database.getAllDownloadedMetadata();
 
       if (downloadedItems.isEmpty) {
-        appLogger.d('No downloaded items to sync watch states for');
+        appLogger.d('没有已下载的项目需要同步观看状态');
         return;
       }
 
-      appLogger.i('Syncing watch states from server for ${downloadedItems.length} items');
+      appLogger.i('正在从服务器同步 ${downloadedItems.length} 个项目的观看状态');
 
-      // Separate episodes (with season parent) from other items (movies, etc.)
-      // Structure: serverId -> seasonRatingKey -> Set<episodeRatingKey>
+      // 将剧集 (带有季父级) 与其他项目 (电影等) 分开
+      // 结构: serverId -> seasonRatingKey -> Set<episodeRatingKey>
       final episodesByServerAndSeason = <String, Map<String, Set<String>>>{};
-      // Structure: serverId -> List<ratingKey>
+      // 结构: serverId -> List<ratingKey>
       final nonEpisodeItems = <String, List<String>>{};
 
       for (final item in downloadedItems) {
         if (item.type == 'episode' && item.parentRatingKey != null) {
-          // Group episodes by server and season for batch fetching
+          // 按服务器和季对剧集进行分组以进行批量获取
           episodesByServerAndSeason
               .putIfAbsent(item.serverId, () => {})
               .putIfAbsent(item.parentRatingKey!, () => {})
               .add(item.ratingKey);
         } else {
-          // Movies, or episodes without parent (fallback to individual fetch)
+          // 电影，或没有父级的剧集 (回退到单独获取)
           nonEpisodeItems.putIfAbsent(item.serverId, () => []).add(item.ratingKey);
         }
       }
@@ -434,7 +433,7 @@ class OfflineWatchSyncService extends ChangeNotifier {
       int syncedCount = 0;
       int seasonCount = 0;
 
-      // Fetch episodes by season (batch) - one API call per season
+      // 按季批量获取剧集 - 每季进行一次 API 调用
       for (final serverEntry in episodesByServerAndSeason.entries) {
         final serverId = serverEntry.key;
         final seasonMap = serverEntry.value;
@@ -445,11 +444,11 @@ class OfflineWatchSyncService extends ChangeNotifier {
             final downloadedEpisodeKeys = seasonEntry.value;
 
             try {
-              // Fetch all episodes in this season with one API call
+              // 通过一次 API 调用获取该季中的所有剧集
               final seasonEpisodes = await client.getChildren(seasonRatingKey);
               seasonCount++;
 
-              // Cache only the episodes we have downloaded
+              // 仅缓存我们已下载的剧集
               for (final episode in seasonEpisodes) {
                 if (downloadedEpisodeKeys.contains(episode.ratingKey)) {
                   await PlexApiCache.instance.put(serverId, '/library/metadata/${episode.ratingKey}', {
@@ -461,13 +460,13 @@ class OfflineWatchSyncService extends ChangeNotifier {
                 }
               }
             } catch (e) {
-              appLogger.d('Failed to sync watch states for season $seasonRatingKey: $e');
+              appLogger.d('同步季 $seasonRatingKey 的观看状态失败: $e');
             }
           }
         });
       }
 
-      // Fetch non-episode items individually (movies, etc.)
+      // 单独获取非剧集项目 (电影等)
       for (final entry in nonEpisodeItems.entries) {
         final serverId = entry.key;
         final ratingKeys = entry.value;
@@ -485,27 +484,27 @@ class OfflineWatchSyncService extends ChangeNotifier {
                 syncedCount++;
               }
             } catch (e) {
-              appLogger.d('Failed to sync watch state for $ratingKey: $e');
+              appLogger.d('同步 $ratingKey 的观看状态失败: $e');
             }
           }
         });
       }
 
       final movieCount = nonEpisodeItems.values.fold(0, (a, b) => a + b.length);
-      appLogger.i('Synced watch states: $seasonCount seasons, $movieCount other items ($syncedCount total)');
+      appLogger.i('已同步观看状态: $seasonCount 季, $movieCount 个其他项目 (共 $syncedCount 个项目)');
 
-      // Notify download provider to refresh metadata from updated cache
+      // 通知下载提供者从更新的缓存中刷新元数据
       if (syncedCount > 0) {
         onWatchStatesRefreshed?.call();
       }
 
       notifyListeners();
     } catch (e) {
-      appLogger.w('Error syncing watch states from server: $e');
+      appLogger.w('从服务器同步观看状态出错: $e');
     }
   }
 
-  /// Clear all pending watch actions (e.g., when logging out).
+  /// 清除所有待处理的观看操作 (例如，退出登录时)。
   Future<void> clearAll() async {
     await _database.clearAllWatchActions();
     notifyListeners();

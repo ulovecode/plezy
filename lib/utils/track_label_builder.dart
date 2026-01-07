@@ -1,12 +1,12 @@
 import 'codec_utils.dart';
 
-/// Utility for building track labels for audio and subtitle tracks.
+/// 用于构建音频和字幕轨道标签的工具类。
 class TrackLabelBuilder {
   TrackLabelBuilder._();
 
-  /// Build a label for an audio track.
+  /// 构建音频轨道标签。
   ///
-  /// Combines title, language, codec, and channel count.
+  /// 组合标题、语言、编解码器和声道数。
   static String buildAudioLabel({
     String? title,
     String? language,
@@ -27,12 +27,12 @@ class TrackLabelBuilder {
     if (channelsCount != null) {
       parts.add('${channelsCount}ch');
     }
-    return parts.isEmpty ? 'Audio Track ${index + 1}' : parts.join(' · ');
+    return parts.isEmpty ? '音频轨道 ${index + 1}' : parts.join(' · ');
   }
 
-  /// Build a label for a subtitle track.
+  /// 构建字幕轨道标签。
   ///
-  /// Combines title, language, and codec (with friendly codec names).
+  /// 组合标题、语言和编解码器（带有友好的编解码器名称）。
   static String buildSubtitleLabel({String? title, String? language, String? codec, required int index}) {
     final parts = <String>[];
     if (title != null && title.isNotEmpty) {
@@ -44,6 +44,6 @@ class TrackLabelBuilder {
     if (codec != null && codec.isNotEmpty) {
       parts.add(CodecUtils.formatSubtitleCodec(codec));
     }
-    return parts.isEmpty ? 'Track ${index + 1}' : parts.join(' · ');
+    return parts.isEmpty ? '轨道 ${index + 1}' : parts.join(' · ');
   }
 }

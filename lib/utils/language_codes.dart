@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
 
-/// Helper class for converting between ISO 639-1 (2-letter) and ISO 639-2 (3-letter) language codes
+/// 用于在 ISO 639-1（2 位字母）和 ISO 639-2（3 位字母）语言代码之间进行转换的辅助类
 class LanguageCodes {
   static Map<String, dynamic>? _codes;
 
-  /// Load the language codes from JSON
+  /// 从 JSON 加载语言代码
   static Future<void> initialize() async {
     if (_codes != null) return;
 
@@ -13,46 +13,46 @@ class LanguageCodes {
     _codes = json.decode(jsonString) as Map<String, dynamic>;
   }
 
-  /// Get all possible variations of a language code
-  /// Handles both ISO 639-1 (2-letter) and ISO 639-2 (3-letter) codes
-  /// Returns a list of codes to check against track languages
+  /// 获取语言代码的所有可能变体
+  /// 处理 ISO 639-1（2 位字母）和 ISO 639-2（3 位字母）代码
+  /// 返回用于检查轨道语言的代码列表
   static List<String> getVariations(String languageCode) {
     if (_codes == null) {
-      throw StateError('LanguageCodes not initialized. Call initialize() first.');
+      throw StateError('LanguageCodes 未初始化。请先调用 initialize()。');
     }
 
     final normalized = languageCode.toLowerCase().trim();
-    final variations = <String>{normalized}; // Use Set to avoid duplicates
+    final variations = <String>{normalized}; // 使用 Set 避免重复
 
-    // Check if it's a 2-letter code (ISO 639-1)
+    // 检查是否为 2 位代码 (ISO 639-1)
     if (_codes!.containsKey(normalized)) {
       final entry = _codes![normalized] as Map<String, dynamic>;
 
-      // Add the 639-1 code
+      // 添加 639-1 代码
       if (entry.containsKey('639-1')) {
         variations.add((entry['639-1'] as String).toLowerCase());
       }
 
-      // Add the 639-2 code
+      // 添加 639-2 代码
       if (entry.containsKey('639-2')) {
         variations.add((entry['639-2'] as String).toLowerCase());
       }
 
-      // Add the 639-2/B code if it exists (bibliographic variant)
+      // 如果存在 639-2/B 代码（书目变体），则添加它
       if (entry.containsKey('639-2/B')) {
         variations.add((entry['639-2/B'] as String).toLowerCase());
       }
     } else {
-      // It might be a 3-letter code, search for it
+      // 可能是 3 位代码，进行搜索
       for (var entry in _codes!.values) {
         final entryMap = entry as Map<String, dynamic>;
 
-        // Check if this entry contains our code as 639-2 or 639-2/B
+        // 检查此条目是否包含我们的代码作为 639-2 或 639-2/B
         final code6392 = entryMap['639-2'] as String?;
         final code6392B = entryMap['639-2/B'] as String?;
 
         if (code6392?.toLowerCase() == normalized || code6392B?.toLowerCase() == normalized) {
-          // Add all variations from this entry
+          // 添加此条目的所有变体
           if (entryMap.containsKey('639-1')) {
             variations.add((entryMap['639-1'] as String).toLowerCase());
           }
@@ -70,19 +70,19 @@ class LanguageCodes {
     return variations.toList();
   }
 
-  /// Get the English name of a language from its code
+  /// 根据语言代码获取语言的英文名称
   static String? getLanguageName(String languageCode) {
     if (_codes == null) return null;
 
     final normalized = languageCode.toLowerCase().trim();
 
-    // Check if it's a 2-letter code
+    // 检查是否为 2 位代码
     if (_codes!.containsKey(normalized)) {
       final entry = _codes![normalized] as Map<String, dynamic>;
       return entry['name'] as String?;
     }
 
-    // Search for 3-letter code
+    // 搜索 3 位代码
     for (var entry in _codes!.values) {
       final entryMap = entry as Map<String, dynamic>;
       final code6392 = entryMap['639-2'] as String?;

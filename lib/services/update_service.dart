@@ -3,44 +3,44 @@ import 'package:dio/dio.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Service to check for new versions on GitHub
-/// Only enabled when ENABLE_UPDATE_CHECK build flag is set
+/// 用于在 GitHub 上检查新版本的服务
+/// 仅当设置了 ENABLE_UPDATE_CHECK 构建标志时才启用
 class UpdateService {
   static final Logger _logger = Logger();
   static const String _githubRepo = 'edde746/plezy';
 
-  // SharedPreferences keys
+  // SharedPreferences 键名
   static const String _keySkippedVersion = 'update_skipped_version';
   static const String _keyLastCheckTime = 'update_last_check_time';
 
-  // Check cooldown: 6 hours
+  // 检查冷却时间：6 小时
   static const Duration _checkCooldown = Duration(hours: 6);
 
-  /// Check if update checking is enabled via build flag
+  /// 检查是否通过构建标志启用了更新检查
   static bool get isUpdateCheckEnabled {
     const enabled = bool.fromEnvironment('ENABLE_UPDATE_CHECK', defaultValue: false);
     return enabled;
   }
 
-  /// Skip a specific version
+  /// 跳过特定版本
   static Future<void> skipVersion(String version) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keySkippedVersion, version);
   }
 
-  /// Get the skipped version
+  /// 获取已跳过的版本
   static Future<String?> getSkippedVersion() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_keySkippedVersion);
   }
 
-  /// Clear skipped version
+  /// 清除已跳过的版本
   static Future<void> clearSkippedVersion() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keySkippedVersion);
   }
 
-  /// Check if cooldown period has passed since last check
+  /// 检查自上次检查以来是否已过冷却期
   static Future<bool> shouldCheckForUpdates() async {
     final prefs = await SharedPreferences.getInstance();
     final lastCheckString = prefs.getString(_keyLastCheckTime);
@@ -54,20 +54,20 @@ class UpdateService {
     return timeSinceLastCheck >= _checkCooldown;
   }
 
-  /// Update the last check timestamp
+  /// 更新上次检查的时间戳
   static Future<void> _updateLastCheckTime() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyLastCheckTime, DateTime.now().toIso8601String());
   }
 
-  /// Internal method that performs the actual update check
-  /// [respectCooldown] - if true, checks cooldown and updates last check time
+  /// 执行实际更新检查的内部方法
+  /// [respectCooldown] - 如果为 true，则检查冷却时间并更新上次检查时间
   static Future<Map<String, dynamic>?> _performUpdateCheck({required bool respectCooldown}) async {
     if (!isUpdateCheckEnabled) {
       return null;
     }
 
-    // Check cooldown if requested
+    // 如果要求，则检查冷却时间
     if (respectCooldown && !await shouldCheckForUpdates()) {
       return null;
     }
@@ -86,23 +86,23 @@ class UpdateService {
         final data = response.data;
         final latestVersion = data['tag_name'] as String;
 
-        // Remove 'v' prefix if present
+        // 如果存在 'v' 前缀，则将其移除
         final cleanVersion = latestVersion.startsWith('v') ? latestVersion.substring(1) : latestVersion;
 
         final hasUpdate = _isNewerVersion(cleanVersion, currentVersion);
 
         if (hasUpdate) {
-          // Check if this version was skipped
+          // 检查此版本是否已被跳过
           final skippedVersion = await getSkippedVersion();
           if (skippedVersion == cleanVersion) {
-            // Update last check time even when skipped (if respecting cooldown)
+            // 即使跳过也更新上次检查时间 (如果考虑冷却时间)
             if (respectCooldown) {
               await _updateLastCheckTime();
             }
             return null;
           }
 
-          // Update last check time on success (if respecting cooldown)
+          // 成功时更新上次检查时间 (如果考虑冷却时间)
           if (respectCooldown) {
             await _updateLastCheckTime();
           }
@@ -112,38 +112,38 @@ class UpdateService {
             'currentVersion': currentVersion,
             'latestVersion': cleanVersion,
             'releaseUrl': data['html_url'] as String,
-            'releaseName': data['name'] as String? ?? 'Version $cleanVersion',
+            'releaseName': data['name'] as String? ?? '版本 $cleanVersion',
             'releaseNotes': data['body'] as String? ?? '',
             'publishedAt': data['published_at'] as String,
           };
         }
       }
 
-      // Update last check time even when no update (if respecting cooldown)
+      // 即使没有更新也更新上次检查时间 (如果考虑冷却时间)
       if (respectCooldown) {
         await _updateLastCheckTime();
       }
     } catch (e) {
-      _logger.e('Failed to check for updates: $e');
+      _logger.e('检查更新失败: $e');
     }
 
     return null;
   }
 
-  /// Check for updates on GitHub (manual check, ignores cooldown)
-  /// Returns a map with update info, or null if no update or error
+  /// 在 GitHub 上检查更新 (手动检查，忽略冷却时间)
+  /// 返回包含更新信息的 Map，如果没有更新或出错则返回 null
   static Future<Map<String, dynamic>?> checkForUpdates({bool silent = false}) async {
     return _performUpdateCheck(respectCooldown: false);
   }
 
-  /// Check for updates on startup (respects cooldown and skipped versions)
-  /// Returns update info if available, null otherwise
+  /// 启动时检查更新 (考虑冷却时间和已跳过的版本)
+  /// 如果有可用更新则返回更新信息，否则返回 null
   static Future<Map<String, dynamic>?> checkForUpdatesOnStartup() async {
     return _performUpdateCheck(respectCooldown: true);
   }
 
-  /// Parse version string into list of integers
-  /// Handles versions like "1.2.3+4" by taking only the numeric parts
+  /// 将版本字符串解析为整数列表
+  /// 通过仅获取数字部分来处理类似 "1.2.3+4" 的版本
   static List<int> _parseVersionParts(String version) {
     return version.split('.').map((p) {
       final numPart = p.split('+').first.split('-').first;
@@ -151,14 +151,14 @@ class UpdateService {
     }).toList();
   }
 
-  /// Compare two version strings
-  /// Returns true if newVersion is newer than currentVersion
+  /// 比较两个版本字符串
+  /// 如果 newVersion 比 currentVersion 新，则返回 true
   static bool _isNewerVersion(String newVersion, String currentVersion) {
     try {
       final newParts = _parseVersionParts(newVersion);
       final currentParts = _parseVersionParts(currentVersion);
 
-      // Compare each part
+      // 比较每个部分
       final maxLength = newParts.length > currentParts.length ? newParts.length : currentParts.length;
 
       for (int i = 0; i < maxLength; i++) {
@@ -169,9 +169,9 @@ class UpdateService {
         if (newPart < currentPart) return false;
       }
 
-      return false; // Versions are equal
+      return false; // 版本相等
     } catch (e) {
-      _logger.e('Error comparing versions: $e');
+      _logger.e('比较版本时出错: $e');
       return false;
     }
   }

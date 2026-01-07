@@ -13,61 +13,61 @@ import '../services/plex_client.dart';
 import '../utils/app_logger.dart';
 import '../utils/plex_cache_parser.dart';
 
-/// Holds Plex thumb path reference for downloaded artwork.
-/// The actual file path is computed from the hash of serverId + thumb path.
+/// 保存下载作品的 Plex 缩略图路径引用。
+/// 实际文件路径由 serverId + 缩略图路径的哈希值计算得出。
 class DownloadedArtwork {
-  /// The Plex thumb path (e.g., /library/metadata/12345/thumb/1234567890)
+  /// Plex 缩略图路径 (例如 /library/metadata/12345/thumb/1234567890)
   final String? thumbPath;
 
   const DownloadedArtwork({this.thumbPath});
 
-  /// Get the local file path for this artwork
+  /// 获取此作品的本地文件路径
   String? getLocalPath(DownloadStorageService storage, String serverId) {
     if (thumbPath == null) return null;
     return storage.getArtworkPathSync(serverId, thumbPath!);
   }
 }
 
-/// Provider for managing download state and operations.
+/// 用于管理下载状态和操作的 Provider。
 class DownloadProvider extends ChangeNotifier {
   final DownloadManagerService _downloadManager;
   StreamSubscription<DownloadProgress>? _progressSubscription;
   StreamSubscription<DeletionProgress>? _deletionProgressSubscription;
 
-  // Track download progress by globalKey (serverId:ratingKey)
+  // 按 globalKey (serverId:ratingKey) 跟踪下载进度
   final Map<String, DownloadProgress> _downloads = {};
 
-  // Store metadata for display
+  // 存储用于显示的元数据
   final Map<String, PlexMetadata> _metadata = {};
 
-  // Store Plex thumb paths for offline display (actual file path computed from hash)
+  // 存储用于离线显示的 Plex 缩略图路径 (实际文件路径由哈希值计算)
   final Map<String, DownloadedArtwork> _artworkPaths = {};
 
-  // Track items currently being queued (building download queue)
+  // 跟踪当前正在排队的项目 (正在构建下载队列)
   final Set<String> _queueing = {};
 
-  // Track items currently being deleted with progress
+  // 跟踪当前正在删除的项目及其进度
   final Map<String, DeletionProgress> _deletionProgress = {};
 
-  // Track total episode counts for shows/seasons (for partial download detection)
-  // Key: globalKey (serverId:ratingKey), Value: total episode count
+  // 跟踪剧集/季的总集数 (用于检测部分下载)
+  // 键: globalKey (serverId:ratingKey), 值: 总集数
   final Map<String, int> _totalEpisodeCounts = {};
 
   DownloadProvider({required DownloadManagerService downloadManager}) : _downloadManager = downloadManager {
-    // Listen to progress updates from the download manager
+    // 监听来自下载管理器的进度更新
     _progressSubscription = _downloadManager.progressStream.listen(_onProgressUpdate);
 
-    // Listen to deletion progress updates
+    // 监听删除进度更新
     _deletionProgressSubscription = _downloadManager.deletionProgressStream.listen(_onDeletionProgressUpdate);
 
-    // Load persisted downloads from database
+    // 从数据库加载持久化的下载项
     _loadPersistedDownloads();
   }
 
-  /// Load all persisted downloads and metadata from the database/cache
+  /// 从数据库/缓存加载所有持久化的下载项和元数据
   Future<void> _loadPersistedDownloads() async {
     try {
-      // Clear existing data to prevent stale entries after deletions
+      // 清除现有数据以防止删除后出现陈旧条目
       _downloads.clear();
       _artworkPaths.clear();
       _metadata.clear();
@@ -76,10 +76,10 @@ class DownloadProvider extends ChangeNotifier {
       final storageService = DownloadStorageService.instance;
       final apiCache = PlexApiCache.instance;
 
-      // Initialize artwork directory path for synchronous access
+      // 初始化作品目录路径以便同步访问
       await storageService.getArtworkDirectory();
 
-      // Load all downloads from database
+      // 从数据库加载所有下载项
       final downloads = await _downloadManager.getAllDownloads();
       for (final item in downloads) {
         _downloads[item.globalKey] = DownloadProgress(
@@ -90,37 +90,37 @@ class DownloadProvider extends ChangeNotifier {
           totalBytes: item.totalBytes ?? 0,
         );
 
-        // Store Plex thumb path reference (file path computed from hash when needed)
+        // 存储 Plex 缩略图路径引用 (需要时从哈希值计算文件路径)
         _artworkPaths[item.globalKey] = DownloadedArtwork(thumbPath: item.thumbPath);
 
-        // Load metadata from API cache (base endpoint - chapters/markers included in data)
+        // 从 API 缓存加载元数据 (基础端点 - 数据中包含章节/标记)
         final cached = await apiCache.get(item.serverId, '/library/metadata/${item.ratingKey}');
         final firstMetadata = PlexCacheParser.extractFirstMetadata(cached);
         if (firstMetadata != null) {
           final metadata = PlexMetadata.fromJson(firstMetadata).copyWith(serverId: item.serverId);
           _metadata[item.globalKey] = metadata;
 
-          // For episodes, also load parent (show and season) metadata
+          // 对于剧集，还加载父级 (剧集和季) 的元数据
           if (metadata.isEpisode) {
             await _loadParentMetadataFromCache(metadata, apiCache);
           }
         }
       }
 
-      // Load total episode counts from SharedPreferences
+      // 从 SharedPreferences 加载总集数
       await _loadTotalEpisodeCounts();
 
       appLogger.i(
-        'Loaded ${_downloads.length} downloads, ${_metadata.length} metadata entries, '
-        'and ${_totalEpisodeCounts.length} episode counts',
+        '已加载 ${_downloads.length} 个下载项, ${_metadata.length} 个元数据条目, '
+        '以及 ${_totalEpisodeCounts.length} 个剧集计数',
       );
       notifyListeners();
     } catch (e) {
-      appLogger.e('Failed to load persisted downloads', error: e);
+      appLogger.e('加载持久化下载项失败', error: e);
     }
   }
 
-  /// Load total episode counts from SharedPreferences
+  /// 从 SharedPreferences 加载总集数
   Future<void> _loadTotalEpisodeCounts() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -131,33 +131,33 @@ class DownloadProvider extends ChangeNotifier {
         final count = prefs.getInt(key);
         if (count != null) {
           _totalEpisodeCounts[globalKey] = count;
-          appLogger.d('📂 Loaded episode count from SharedPrefs: $globalKey = $count');
+          appLogger.d('📂 从 SharedPrefs 加载剧集计数: $globalKey = $count');
         }
       }
 
-      appLogger.i('📚 Loaded ${_totalEpisodeCounts.length} episode counts from SharedPreferences');
+      appLogger.i('📚 从 SharedPreferences 加载了 ${_totalEpisodeCounts.length} 个剧集计数');
     } catch (e) {
-      appLogger.w('Failed to load episode counts', error: e);
+      appLogger.w('加载剧集计数失败', error: e);
     }
   }
 
-  /// Persist total episode count to SharedPreferences
+  /// 将总集数持久化到 SharedPreferences
   Future<void> _persistTotalEpisodeCount(String globalKey, int count) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('episode_count_$globalKey', count);
-      appLogger.d('Persisted episode count for $globalKey: $count');
+      appLogger.d('已持久化 $globalKey 的剧集计数: $count');
     } catch (e) {
-      appLogger.w('Failed to persist episode count for $globalKey', error: e);
+      appLogger.w('持久化 $globalKey 的剧集计数失败', error: e);
     }
   }
 
-  /// Load parent (show and season) metadata from cache for an episode
+  /// 从缓存中加载剧集的父级 (剧集和季) 元数据
   Future<void> _loadParentMetadataFromCache(PlexMetadata episode, PlexApiCache apiCache) async {
     final serverId = episode.serverId;
     if (serverId == null) return;
 
-    // Load show metadata (base endpoint)
+    // 加载剧集元数据 (基础端点)
     final showRatingKey = episode.grandparentRatingKey;
     if (showRatingKey != null) {
       final showGlobalKey = '$serverId:$showRatingKey';
@@ -167,7 +167,7 @@ class DownloadProvider extends ChangeNotifier {
         if (showJson != null) {
           final showMetadata = PlexMetadata.fromJson(showJson).copyWith(serverId: serverId);
           _metadata[showGlobalKey] = showMetadata;
-          // Store artwork reference for offline display
+          // 存储作品引用以供离线显示
           if (showMetadata.thumb != null) {
             _artworkPaths[showGlobalKey] = DownloadedArtwork(thumbPath: showMetadata.thumb);
           }
@@ -175,7 +175,7 @@ class DownloadProvider extends ChangeNotifier {
       }
     }
 
-    // Load season metadata (base endpoint)
+    // 加载季元数据 (基础端点)
     final seasonRatingKey = episode.parentRatingKey;
     if (seasonRatingKey != null) {
       final seasonGlobalKey = '$serverId:$seasonRatingKey';
@@ -185,7 +185,7 @@ class DownloadProvider extends ChangeNotifier {
         if (seasonJson != null) {
           final seasonMetadata = PlexMetadata.fromJson(seasonJson).copyWith(serverId: serverId);
           _metadata[seasonGlobalKey] = seasonMetadata;
-          // Store artwork reference for offline display
+          // 存储作品引用以供离线显示
           if (seasonMetadata.thumb != null) {
             _artworkPaths[seasonGlobalKey] = DownloadedArtwork(thumbPath: seasonMetadata.thumb);
           }
@@ -195,20 +195,19 @@ class DownloadProvider extends ChangeNotifier {
   }
 
   void _onProgressUpdate(DownloadProgress progress) {
-    appLogger.d('Progress update received: ${progress.globalKey} - ${progress.status} - ${progress.progress}%');
+    appLogger.d('收到进度更新: ${progress.globalKey} - ${progress.status} - ${progress.progress}%');
 
     _downloads[progress.globalKey] = progress;
 
-    // Sync artwork paths when they are available
+    // 当作品路径可用时同步它们
     if (progress.hasArtworkPaths) {
       _artworkPaths[progress.globalKey] = DownloadedArtwork(thumbPath: progress.thumbPath);
     }
 
-    appLogger.d('Notifying listeners for ${progress.globalKey}');
+    appLogger.d('正在通知 ${progress.globalKey} 的监听器');
     notifyListeners();
   }
 
-  @override
   @override
   void dispose() {
     _progressSubscription?.cancel();
@@ -216,13 +215,13 @@ class DownloadProvider extends ChangeNotifier {
     super.dispose();
   }
 
-  /// All current download progress entries
+  /// 所有当前的下载进度条目
   Map<String, DownloadProgress> get downloads => Map.unmodifiable(_downloads);
 
-  /// All metadata for downloads
+  /// 下载项的所有元数据
   Map<String, PlexMetadata> get metadata => Map.unmodifiable(_metadata);
 
-  /// Get all queued/downloading items (for Queue tab)
+  /// 获取所有正在排队/下载中的项目 (用于“队列”选项卡)
   List<DownloadProgress> get queuedDownloads {
     return _downloads.values
         .where(
@@ -234,12 +233,12 @@ class DownloadProvider extends ChangeNotifier {
         .toList();
   }
 
-  /// Get all completed downloads
+  /// 获取所有已完成的下载项
   List<DownloadProgress> get completedDownloads {
     return _downloads.values.where((p) => p.status == DownloadStatus.completed).toList();
   }
 
-  /// Get completed TV episode downloads (individual episodes)
+  /// 获取已完成下载的电视剧剧集 (单集)
   List<PlexMetadata> get downloadedEpisodes {
     return _metadata.entries
         .where((entry) {
@@ -250,8 +249,8 @@ class DownloadProvider extends ChangeNotifier {
         .toList();
   }
 
-  /// Get unique TV shows that have downloaded episodes
-  /// Returns stored show metadata, or synthesizes from episode metadata as fallback
+  /// 获取具有已下载剧集的唯一电视剧
+  /// 返回存储的剧集元数据，如果不存在则从剧集元数据合成
   List<PlexMetadata> get downloadedShows {
     final Map<String, PlexMetadata> shows = {};
 
@@ -263,15 +262,15 @@ class DownloadProvider extends ChangeNotifier {
       if (progress?.status == DownloadStatus.completed && meta.type == 'episode') {
         final showRatingKey = meta.grandparentRatingKey;
         if (showRatingKey != null && !shows.containsKey(showRatingKey)) {
-          // Try to get stored show metadata first
+          // 优先获取存储的剧集元数据
           final showGlobalKey = '${meta.serverId}:$showRatingKey';
           final storedShow = _metadata[showGlobalKey];
 
           if (storedShow != null && storedShow.type == 'show') {
-            // Use stored show metadata (has year, summary, clearLogo)
+            // 使用存储的剧集元数据 (包含年份、摘要、clearLogo)
             shows[showRatingKey] = storedShow;
           } else {
-            // Fallback: synthesize from episode metadata (missing year, summary)
+            // 备选方案：从剧集元数据合成 (缺失年份、摘要)
             shows[showRatingKey] = PlexMetadata(
               ratingKey: showRatingKey,
               key: '/library/metadata/$showRatingKey',
@@ -289,7 +288,7 @@ class DownloadProvider extends ChangeNotifier {
     return shows.values.toList();
   }
 
-  /// Get completed movie downloads
+  /// 获取已完成下载的电影
   List<PlexMetadata> get downloadedMovies {
     return _metadata.entries
         .where((entry) {
@@ -300,20 +299,20 @@ class DownloadProvider extends ChangeNotifier {
         .toList();
   }
 
-  /// Get metadata for a specific download
+  /// 获取特定下载项的元数据
   PlexMetadata? getMetadata(String globalKey) => _metadata[globalKey];
 
-  /// Get artwork paths for a specific download (for offline display)
+  /// 获取特定下载项的作品路径 (用于离线显示)
   DownloadedArtwork? getArtworkPaths(String globalKey) => _artworkPaths[globalKey];
 
-  /// Get local file path for any artwork type (thumb, art, clearLogo, etc.)
-  /// Returns null if artwork directory isn't initialized or artworkPath is null
+  /// 获取任何作品类型 (缩略图、背景图、clearLogo 等) 的本地文件路径
+  /// 如果作品目录未初始化或作品路径为 null，则返回 null
   String? getArtworkLocalPath(String serverId, String? artworkPath) {
     if (artworkPath == null) return null;
     return DownloadStorageService.instance.getArtworkPathSync(serverId, artworkPath);
   }
 
-  /// Get downloaded episodes for a specific show (by grandparentRatingKey)
+  /// 获取特定剧集的已下载剧集 (通过 grandparentRatingKey)
   List<PlexMetadata> getDownloadedEpisodesForShow(String showRatingKey) {
     return _metadata.entries
         .where((entry) {
@@ -327,7 +326,7 @@ class DownloadProvider extends ChangeNotifier {
         .toList();
   }
 
-  /// Get all episode downloads (any status) for a specific show
+  /// 获取特定剧集的所有剧集下载项 (任何状态)
   List<DownloadProgress> _getEpisodeDownloadsForShow(String showRatingKey) {
     return _downloads.entries
         .where((entry) {
@@ -338,7 +337,7 @@ class DownloadProvider extends ChangeNotifier {
         .toList();
   }
 
-  /// Get all episode downloads (any status) for a specific season
+  /// 获取特定季的所有剧集下载项 (任何状态)
   List<DownloadProgress> _getEpisodeDownloadsForSeason(String seasonRatingKey) {
     return _downloads.entries
         .where((entry) {
@@ -349,8 +348,8 @@ class DownloadProvider extends ChangeNotifier {
         .toList();
   }
 
-  /// Calculate aggregate progress for a show (based on all its episodes)
-  /// Returns synthetic DownloadProgress with aggregated values
+  /// 计算剧集的总进度 (基于其所有剧集)
+  /// 返回包含聚合值的合成 DownloadProgress
   DownloadProgress? getAggregateProgressForShow(String serverId, String showRatingKey) {
     return _calculateAggregateProgress(
       serverId: serverId,
@@ -360,8 +359,8 @@ class DownloadProvider extends ChangeNotifier {
     );
   }
 
-  /// Calculate aggregate progress for a season (based on all its episodes)
-  /// Returns synthetic DownloadProgress with aggregated values
+  /// 计算季的总进度 (基于其所有剧集)
+  /// 返回包含聚合值的合成 DownloadProgress
   DownloadProgress? getAggregateProgressForSeason(String serverId, String seasonRatingKey) {
     return _calculateAggregateProgress(
       serverId: serverId,
@@ -371,7 +370,7 @@ class DownloadProvider extends ChangeNotifier {
     );
   }
 
-  /// Shared helper to calculate aggregate download progress for shows/seasons
+  /// 用于计算剧集/季聚合下载进度的共享助手
   DownloadProgress? _calculateAggregateProgress({
     required String serverId,
     required String ratingKey,
@@ -380,23 +379,23 @@ class DownloadProvider extends ChangeNotifier {
   }) {
     final globalKey = '$serverId:$ratingKey';
 
-    // DIAGNOSTIC: Check all sources of episode count
+    // 诊断：检查剧集计数的所有来源
     final meta = _metadata[globalKey];
     final metadataLeafCount = meta?.leafCount;
     final storedCount = _totalEpisodeCounts[globalKey];
     final downloadedCount = episodes.length;
 
     appLogger.d(
-      '📊 Episode count sources for $entityType $ratingKey:\n'
-      '  - Metadata leafCount: $metadataLeafCount\n'
-      '  - Stored count: $storedCount\n'
-      '  - Downloaded episodes: $downloadedCount\n'
-      '  - Metadata exists: ${meta != null}\n'
-      '  - Type: ${meta?.type}\n'
-      '  - Title: ${meta?.title}',
+      '📊 $entityType $ratingKey 的剧集计数来源:\n'
+      '  - 元数据 leafCount: $metadataLeafCount\n'
+      '  - 存储计数: $storedCount\n'
+      '  - 已下载剧集: $downloadedCount\n'
+      '  - 元数据是否存在: ${meta != null}\n'
+      '  - 类型: ${meta?.type}\n'
+      '  - 标题: ${meta?.title}',
     );
 
-    // Get total episode count - Use metadata.leafCount as primary source
+    // 获取总剧集数 - 优先使用 metadata.leafCount
     int totalEpisodes;
     String countSource;
 
@@ -405,21 +404,21 @@ class DownloadProvider extends ChangeNotifier {
       countSource = 'metadata.leafCount';
     } else if (storedCount != null && storedCount > 0) {
       totalEpisodes = storedCount;
-      countSource = 'stored count (SharedPreferences)';
+      countSource = '存储计数 (SharedPreferences)';
     } else {
       totalEpisodes = downloadedCount;
-      countSource = 'downloaded episodes (fallback)';
+      countSource = '已下载剧集 (备选方案)';
     }
 
-    appLogger.d('✅ Using totalEpisodes=$totalEpisodes from [$countSource] for $entityType $ratingKey');
+    appLogger.d('✅ 正在为 $entityType $ratingKey 使用来自 [$countSource] 的 totalEpisodes=$totalEpisodes');
 
-    // If we have stored count but no downloads, check if it's a valid partial state
+    // 如果我们有存储的计数但没有下载项，检查它是否为有效的部分下载状态
     if (totalEpisodes == 0 || (episodes.isEmpty && totalEpisodes > 0)) {
-      appLogger.d('⚠️  No valid downloads for $entityType $ratingKey, returning null');
+      appLogger.d('⚠️  $entityType $ratingKey 没有有效的下载项，返回 null');
       return null;
     }
 
-    // Calculate aggregate statistics
+    // 计算聚合统计信息
     int completedCount = 0;
     int downloadingCount = 0;
     int queuedCount = 0;
@@ -440,7 +439,7 @@ class DownloadProvider extends ChangeNotifier {
       }
     }
 
-    // Determine overall status
+    // 确定总体状态
     final DownloadStatus overallStatus;
     if (completedCount == totalEpisodes) {
       overallStatus = DownloadStatus.completed;
@@ -456,13 +455,13 @@ class DownloadProvider extends ChangeNotifier {
       return null;
     }
 
-    // Calculate overall progress percentage based on TOTAL episodes
+    // 基于总剧集数计算总体进度百分比
     final int overallProgress = totalEpisodes > 0 ? ((completedCount * 100) / totalEpisodes).round() : 0;
 
     appLogger.d(
-      'Aggregate progress for $entityType $ratingKey: $overallProgress% '
-      '($completedCount completed, $downloadingCount downloading, '
-      '$queuedCount queued of $totalEpisodes total) - Status: $overallStatus',
+      '$entityType $ratingKey 的聚合进度: $overallProgress% '
+      '($completedCount 已完成, $downloadingCount 下载中, '
+      '总计 $totalEpisodes 中的 $queuedCount 个已排队) - 状态: $overallStatus',
     );
 
     return DownloadProgress(
@@ -471,40 +470,40 @@ class DownloadProvider extends ChangeNotifier {
       progress: overallProgress,
       downloadedBytes: 0,
       totalBytes: 0,
-      currentFile: '$completedCount/$totalEpisodes episodes',
+      currentFile: '$completedCount/$totalEpisodes 剧集',
     );
   }
 
-  /// Whether there are any downloads (active or completed)
+  /// 是否存在任何下载项 (活动中或已完成)
   bool get hasDownloads => _downloads.isNotEmpty;
 
-  /// Whether there are any active downloads
+  /// 是否存在任何活动中的下载项
   bool get hasActiveDownloads =>
       _downloads.values.any((p) => p.status == DownloadStatus.downloading || p.status == DownloadStatus.queued);
 
-  /// Get download progress for a specific item
-  /// For shows/seasons, returns aggregate progress of all child episodes
-  /// For episodes/movies, returns direct progress
+  /// 获取特定项目的下载进度
+  /// 对于剧集/季，返回其所有子剧集的聚合进度
+  /// 对于剧集/电影，返回直接进度
   DownloadProgress? getProgress(String globalKey) {
-    // First check if we have direct progress (for episodes/movies)
+    // 首先检查是否有直接进度 (针对剧集/电影)
     final directProgress = _downloads[globalKey];
     if (directProgress != null) {
       return directProgress;
     }
 
-    // If no direct progress, check if this is a show or season
-    // and calculate aggregate progress from episodes
+    // 如果没有直接进度，检查这是否是剧集或季
+    // 并从剧集中计算聚合进度
     final parts = globalKey.split(':');
     if (parts.length != 2) return null;
 
     final serverId = parts[0];
     final ratingKey = parts[1];
 
-    // Try to get metadata to determine type
+    // 尝试获取元数据以确定类型
     final meta = _metadata[globalKey];
     if (meta == null) {
-      // No metadata stored yet, might be a show/season being queued
-      // Check if any episodes exist for this as a parent
+      // 尚未存储元数据，可能是正在排队的剧集/季
+      // 检查是否存在以此为父级的任何剧集
       final episodesAsShow = _getEpisodeDownloadsForShow(ratingKey);
       if (episodesAsShow.isNotEmpty) {
         return getAggregateProgressForShow(serverId, ratingKey);
@@ -518,7 +517,7 @@ class DownloadProvider extends ChangeNotifier {
       return null;
     }
 
-    // We have metadata, check type
+    // 我们有元数据，检查类型
     final type = meta.type.toLowerCase();
     if (type == 'show') {
       return getAggregateProgressForShow(serverId, ratingKey);
@@ -529,15 +528,15 @@ class DownloadProvider extends ChangeNotifier {
     return null;
   }
 
-  /// Check if an item is downloaded
-  /// For shows/seasons, checks if all episodes are downloaded
+  /// 检查项目是否已下载
+  /// 对于剧集/季，检查所有剧集是否已下载
   bool isDownloaded(String globalKey) {
     final progress = getProgress(globalKey);
     return progress?.status == DownloadStatus.completed;
   }
 
-  /// Check if an item is currently downloading
-  /// For shows/seasons, checks if any episodes are downloading
+  /// 检查项目是否正在下载中
+  /// 对于剧集/季，检查是否有任何剧集正在下载
   bool isDownloading(String globalKey) {
     final progress = getProgress(globalKey);
     return progress?.status == DownloadStatus.downloading;

@@ -11,7 +11,7 @@ import '../utils/video_player_navigation.dart';
 import '../i18n/strings.g.dart';
 import 'plex_client.dart';
 
-/// Result type for play queue operations
+/// 播放队列操作的结果类型
 sealed class PlayQueueResult {
   const PlayQueueResult();
 }
@@ -29,13 +29,13 @@ class PlayQueueError extends PlayQueueResult {
   const PlayQueueError(this.error);
 }
 
-/// Service to handle play queue creation and navigation.
+/// 处理播放队列创建和导航的服务。
 ///
-/// Centralizes the common pattern of:
-/// 1. Creating a play queue via various methods
-/// 2. Setting up PlaybackStateProvider
-/// 3. Navigating to the video player
-/// 4. Handling errors with appropriate feedback
+/// 集中处理以下常见模式：
+/// 1. 通过各种方法创建播放队列
+/// 2. 设置 PlaybackStateProvider
+/// 3. 导航到视频播放器
+/// 4. 处理带有适当反馈的错误
 class PlayQueueLauncher {
   final BuildContext context;
   final PlexClient client;
@@ -44,9 +44,9 @@ class PlayQueueLauncher {
 
   PlayQueueLauncher({required this.context, required this.client, this.serverId, this.serverName});
 
-  /// Launch playback from a collection or playlist.
+  /// 从集合或播放列表启动播放。
   Future<PlayQueueResult> launchFromCollectionOrPlaylist({
-    required dynamic item, // PlexMetadata (collection) or PlexPlaylist
+    required dynamic item, // PlexMetadata (集合) 或 PlexPlaylist
     required bool shuffle,
     bool showLoadingIndicator = true,
   }) async {
@@ -54,7 +54,7 @@ class PlayQueueLauncher {
     final isPlaylist = item is PlexPlaylist;
 
     if (!isCollection && !isPlaylist) {
-      return PlayQueueError(Exception('Item must be either a collection or playlist'));
+      return PlayQueueError(Exception('项目必须是集合或播放列表'));
     }
 
     return _executeWithLoading(
@@ -68,17 +68,17 @@ class PlayQueueLauncher {
         PlayQueueResponse? playQueue;
 
         if (isCollection) {
-          // Get machine identifier (fetch if not cached in config)
+          // 获取机器标识符 (如果配置中未缓存则获取)
           final machineId = client.config.machineIdentifier ?? await client.getMachineIdentifier();
 
           if (machineId == null) {
-            throw Exception('Could not get server machine identifier');
+            throw Exception('无法获取服务器机器标识符');
           }
 
           final collectionUri = 'server://$machineId/com.plexapp.plugins.library/library/collections/${item.ratingKey}';
           playQueue = await client.createPlayQueue(uri: collectionUri, type: 'video', shuffle: shuffle ? 1 : 0);
         } else {
-          // For playlists, use playlistID parameter
+          // 对于播放列表，使用 playlistID 参数
           playQueue = await client.createPlayQueue(
             playlistID: int.parse(item.ratingKey),
             type: 'video',
@@ -86,7 +86,7 @@ class PlayQueueLauncher {
           );
         }
 
-        // If the queue is empty, try fetching it again with getPlayQueue
+        // 如果队列为空，尝试使用 getPlayQueue 再次获取
         if (playQueue != null && (playQueue.items == null || playQueue.items!.isEmpty)) {
           final fetchedQueue = await client.getPlayQueue(playQueue.playQueueID);
           if (fetchedQueue != null && fetchedQueue.items != null && fetchedQueue.items!.isNotEmpty) {
@@ -94,7 +94,7 @@ class PlayQueueLauncher {
           }
         }
 
-        // Close loading dialog before navigating to the player
+        // 在导航到播放器之前关闭加载对话框
         await dismissLoading();
 
         return _launchFromQueue(
@@ -107,7 +107,7 @@ class PlayQueueLauncher {
     );
   }
 
-  /// Launch playback from a playlist starting at a specific item.
+  /// 从播放列表中的特定项目开始启动播放。
   Future<PlayQueueResult> launchFromPlaylistItem({
     required PlexPlaylist playlist,
     required PlexMetadata selectedItem,
@@ -123,7 +123,7 @@ class PlayQueueLauncher {
           key: selectedItem.key,
         );
 
-        // Close loading dialog before navigating to the player
+        // 在导航到播放器之前关闭加载对话框
         await dismissLoading();
 
         return _launchFromQueue(
@@ -137,33 +137,33 @@ class PlayQueueLauncher {
     );
   }
 
-  /// Launch shuffled playback for a show or season.
+  /// 为剧集或季启动随机播放。
   Future<PlayQueueResult> launchShuffledShow({required PlexMetadata metadata, bool showLoadingIndicator = true}) async {
     final mediaType = metadata.mediaType;
 
     if (mediaType != PlexMediaType.show && mediaType != PlexMediaType.season) {
-      return PlayQueueError(Exception('Shuffle play only works for shows and seasons'));
+      return PlayQueueError(Exception('随机播放仅适用于剧集和季'));
     }
 
     return _executeWithLoading(
       showLoading: showLoadingIndicator,
       action: t.common.shuffle,
       execute: (dismissLoading) async {
-        // Determine the rating key for the play queue
+        // 确定播放队列的 rating key
         String showRatingKey;
         if (mediaType == PlexMediaType.show) {
           showRatingKey = metadata.ratingKey;
         } else {
-          // For seasons, we need the show's rating key
+          // 对于季，我们需要剧集的 rating key
           if (metadata.parentRatingKey == null) {
-            throw Exception('Season is missing parentRatingKey');
+            throw Exception('季缺少 parentRatingKey');
           }
           showRatingKey = metadata.parentRatingKey!;
         }
 
         final playQueue = await client.createShowPlayQueue(showRatingKey: showRatingKey, shuffle: 1);
 
-        // Close loading dialog before navigating to the player
+        // 在导航到播放器之前关闭加载对话框
         await dismissLoading();
 
         return _launchFromQueue(
@@ -177,7 +177,7 @@ class PlayQueueLauncher {
     );
   }
 
-  /// Core method to launch playback from a play queue.
+  /// 从播放队列启动播放的核心方法。
   Future<PlayQueueResult> _launchFromQueue({
     required PlayQueueResponse? playQueue,
     required String ratingKey,
@@ -192,28 +192,28 @@ class PlayQueueLauncher {
 
     if (!context.mounted) return const PlayQueueError('Context not mounted');
 
-    // Set up playback state
+    // 设置播放状态
     final playbackState = context.read<PlaybackStateProvider>();
     playbackState.setClient(client);
     await playbackState.setPlaybackFromPlayQueue(playQueue, ratingKey, serverId: serverId, serverName: serverName);
 
     if (!context.mounted) return const PlayQueueError('Context not mounted');
 
-    // Determine which item to navigate to
+    // 确定导航到哪个项目
     var itemToPlay = selectedItem ?? playQueue.items!.first;
 
-    // Copy server info if needed
+    // 如果需要，复制服务器信息
     if (copyServerInfo && serverId != null) {
       itemToPlay = itemToPlay.copyWith(serverId: serverId, serverName: serverName);
     }
 
-    // Navigate to video player
+    // 导航到视频播放器
     await navigateToVideoPlayer(context, metadata: itemToPlay);
 
     return const PlayQueueSuccess();
   }
 
-  /// Execute an action with optional loading indicator and error handling.
+  /// 执行带有可选加载指示器和错误处理的操作。
   Future<PlayQueueResult> _executeWithLoading({
     required bool showLoading,
     required String action,
@@ -222,7 +222,7 @@ class PlayQueueLauncher {
     BuildContext? loadingDialogContext;
     var loadingVisible = false;
 
-    // Show loading indicator
+    // 显示加载指示器
     if (showLoading && context.mounted) {
       loadingVisible = true;
       showDialog(
@@ -240,8 +240,8 @@ class PlayQueueLauncher {
       final dialogContext = loadingDialogContext;
       if (dialogContext == null) return;
 
-      // Only dismiss if the dialog is still the current route to avoid
-      // accidentally popping the player after navigation.
+      // 仅当对话框仍然是当前路由时才关闭，以避免
+      // 在导航后意外关闭播放器。
       final route = ModalRoute.of(dialogContext);
       if (route?.isCurrent ?? false) {
         Navigator.of(dialogContext).pop();
@@ -253,7 +253,7 @@ class PlayQueueLauncher {
     try {
       final result = await execute(dismissLoading);
 
-      // Handle empty queue result
+      // 处理空队列结果
       if (result is PlayQueueEmpty && context.mounted) {
         showErrorSnackBar(context, t.messages.failedToCreatePlayQueueNoItems);
       }
@@ -261,7 +261,7 @@ class PlayQueueLauncher {
       await dismissLoading();
       return result;
     } catch (e) {
-      appLogger.e('Failed to $action', error: e);
+      appLogger.e('操作失败: $action', error: e);
 
       if (context.mounted) {
         showErrorSnackBar(context, t.messages.failedPlayback(action: action, error: e.toString()));

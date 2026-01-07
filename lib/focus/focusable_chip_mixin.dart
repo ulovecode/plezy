@@ -2,24 +2,24 @@ import 'package:flutter/material.dart';
 
 import 'dpad_navigator.dart';
 
-/// Callbacks for chip key event handling.
+/// Chip 按键事件处理的回调。
 class ChipKeyCallbacks {
-  /// Called when SELECT key is pressed.
+  /// 当按下选择（SELECT）键时调用。
   final VoidCallback? onSelect;
 
-  /// Called when DOWN arrow is pressed.
+  /// 当按下向下方向键时调用。
   final VoidCallback? onNavigateDown;
 
-  /// Called when UP arrow is pressed.
+  /// 当按下向上方向键时调用。
   final VoidCallback? onNavigateUp;
 
-  /// Called when LEFT arrow is pressed.
+  /// 当按下向左方向键时调用。
   final VoidCallback? onNavigateLeft;
 
-  /// Called when RIGHT arrow is pressed.
+  /// 当按下向右方向键时调用。
   final VoidCallback? onNavigateRight;
 
-  /// Called when BACK key is pressed.
+  /// 当按下返回（BACK）键时调用。
   final VoidCallback? onBack;
 
   const ChipKeyCallbacks({
@@ -32,47 +32,47 @@ class ChipKeyCallbacks {
   });
 }
 
-/// A mixin that provides common FocusNode lifecycle management for chip widgets.
+/// 一个混入（mixin），为 Chip 小部件提供常见的 FocusNode 生命周期管理。
 ///
-/// This mixin handles:
-/// - Internal/external FocusNode pattern
-/// - `_isFocused` state tracking
-/// - Listener setup in `initState`
-/// - Listener handoff in `didUpdateWidget`
-/// - Cleanup in `dispose`
+/// 此混入处理：
+/// - 内部/外部 FocusNode 模式
+/// - `_isFocused` 状态跟踪
+/// - 在 `initState` 中设置监听器
+/// - 在 `didUpdateWidget` 中进行监听器交接
+/// - 在 `dispose` 中清理
 ///
-/// To use this mixin:
-/// 1. Add `with FocusableChipStateMixin<YourWidget>` to your State class
-/// 2. Implement [widgetFocusNode] to return the widget's optional focusNode
-/// 3. Implement [debugLabel] to return a debug label for the internal node
-/// 4. Call [initFocusNode] in your `initState`
-/// 5. Call [updateFocusNode] in your `didUpdateWidget`
-/// 6. Call [disposeFocusNode] in your `dispose`
-/// 7. Use [focusNode] and [isFocused] in your build method
+/// 如何使用此混入：
+/// 1. 在你的 State 类中添加 `with FocusableChipStateMixin<YourWidget>`
+/// 2. 实现 [widgetFocusNode] 以返回小部件的可选 focusNode
+/// 3. 实现 [debugLabel] 以返回内部节点的调试标签
+/// 4. 在你的 `initState` 中调用 [initFocusNode]
+/// 5. 在你的 `didUpdateWidget` 中调用 [updateFocusNode]
+/// 6. 在你的 `dispose` 中调用 [disposeFocusNode]
+/// 7. 在 build 方法中使用 [focusNode] 和 [isFocused]
 mixin FocusableChipStateMixin<T extends StatefulWidget> on State<T> {
   FocusNode? _internalFocusNode;
   bool _isFocused = false;
 
-  /// Override to return the widget's optional external focus node.
+  /// 重写以返回小部件的可选外部焦点节点。
   FocusNode? get widgetFocusNode;
 
-  /// Override to return a debug label for the internal focus node.
+  /// 重写以返回内部焦点节点的调试标签。
   String get debugLabel;
 
-  /// The active focus node (external if provided, otherwise internal).
+  /// 活动焦点节点（如果提供了外部则使用外部，否则使用内部）。
   FocusNode get focusNode {
     return widgetFocusNode ?? (_internalFocusNode ??= FocusNode(debugLabel: debugLabel));
   }
 
-  /// Whether this widget is currently focused.
+  /// 此小部件当前是否获得焦点。
   bool get isFocused => _isFocused;
 
-  /// Call this in your `initState` to set up the focus listener.
+  /// 在你的 `initState` 中调用此方法以设置焦点监听器。
   void initFocusNode() {
     focusNode.addListener(_onFocusChange);
   }
 
-  /// Call this in your `didUpdateWidget` with the old widget's focusNode.
+  /// 在你的 `didUpdateWidget` 中调用此方法，并传入旧小部件的 focusNode。
   void updateFocusNode(FocusNode? oldFocusNode) {
     if (oldFocusNode != widgetFocusNode) {
       oldFocusNode?.removeListener(_onFocusChange);
@@ -80,7 +80,7 @@ mixin FocusableChipStateMixin<T extends StatefulWidget> on State<T> {
     }
   }
 
-  /// Call this in your `dispose` to clean up the focus listener.
+  /// 在你的 `dispose` 中调用此方法以清理焦点监听器。
   void disposeFocusNode() {
     focusNode.removeListener(_onFocusChange);
     _internalFocusNode?.dispose();
@@ -92,15 +92,15 @@ mixin FocusableChipStateMixin<T extends StatefulWidget> on State<T> {
     }
   }
 
-  /// Shared key event handler for chip widgets.
+  /// Chip 小部件的共享按键事件处理器。
   ///
-  /// Handles common key patterns:
-  /// - SELECT key -> onSelect
-  /// - Arrow keys -> navigation callbacks
-  /// - BACK key -> onBack
+  /// 处理常见的按键模式：
+  /// - 选择键 -> onSelect
+  /// - 方向键 -> 导航回调
+  /// - 返回键 -> onBack
   ///
-  /// Returns [KeyEventResult.handled] if the event was consumed,
-  /// [KeyEventResult.ignored] otherwise.
+  /// 如果事件被消耗则返回 [KeyEventResult.handled]，
+  /// 否则返回 [KeyEventResult.ignored]。
   KeyEventResult handleChipKeyEvent(FocusNode node, KeyEvent event, ChipKeyCallbacks callbacks) {
     if (!event.isActionable) {
       return KeyEventResult.ignored;
@@ -108,37 +108,37 @@ mixin FocusableChipStateMixin<T extends StatefulWidget> on State<T> {
 
     final key = event.logicalKey;
 
-    // SELECT key activates the chip
+    // 选择键激活 chip
     if (key.isSelectKey && callbacks.onSelect != null) {
       callbacks.onSelect!();
       return KeyEventResult.handled;
     }
 
-    // LEFT arrow
+    // 左方向键
     if (key.isLeftKey && callbacks.onNavigateLeft != null) {
       callbacks.onNavigateLeft!();
       return KeyEventResult.handled;
     }
 
-    // RIGHT arrow
+    // 右方向键
     if (key.isRightKey && callbacks.onNavigateRight != null) {
       callbacks.onNavigateRight!();
       return KeyEventResult.handled;
     }
 
-    // DOWN arrow
+    // 下方向键
     if (key.isDownKey) {
       callbacks.onNavigateDown?.call();
       return KeyEventResult.handled;
     }
 
-    // UP arrow
+    // 上方向键
     if (key.isUpKey && callbacks.onNavigateUp != null) {
       callbacks.onNavigateUp!();
       return KeyEventResult.handled;
     }
 
-    // BACK key
+    // 返回键
     if (key.isBackKey && callbacks.onBack != null) {
       callbacks.onBack!();
       return KeyEventResult.handled;

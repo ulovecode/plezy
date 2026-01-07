@@ -1,33 +1,62 @@
 import 'plex_user_profile.dart';
 
+/// 切换用户后的响应模型
 class UserSwitchResponse {
+  /// 用户 ID
   final int id;
+  /// 用户 UUID
   final String uuid;
+  /// 用户名
   final String username;
+  /// 用户标题
   final String title;
+  /// 用户邮箱
   final String email;
+  /// 友好名称
   final String? friendlyName;
+  /// 区域语言
   final String? locale;
+  /// 是否已确认
   final bool confirmed;
+  /// 加入时间（时间戳）
   final int joinedAt;
+  /// 是否仅邮箱认证
   final bool emailOnlyAuth;
+  /// 是否有密码
   final bool hasPassword;
+  /// 是否受保护（通常指有 PIN 码）
   final bool protected;
+  /// 头像 URL
   final String thumb;
+  /// 认证令牌
   final String authToken;
+  /// 邮件列表是否激活
   final bool? mailingListActive;
+  /// 记录播放进度的类型
   final String scrobbleTypes;
+  /// 国家/地区
   final String country;
+  /// 是否受限
   final bool restricted;
+  /// 是否匿名
   final bool? anonymous;
+  /// 是否属于 Home 组
   final bool home;
+  /// 是否是访客
   final bool guest;
+  /// Home 组大小
   final int homeSize;
+  /// 是否是 Home 管理员
   final bool homeAdmin;
+  /// 最大 Home 组大小
   final int maxHomeSize;
+  /// 用户个人资料信息
   final PlexUserProfile profile;
+  /// 是否启用双重身份验证
   final bool twoFactorEnabled;
+  /// 是否已创建备份代码
   final bool backupCodesCreated;
+  /// 归属合作伙伴
   final String? attributionPartner;
 
   UserSwitchResponse({

@@ -6,28 +6,28 @@ import '../mpv/mpv.dart';
 import '../models/plex_media_version.dart';
 import '../utils/app_logger.dart';
 
-/// Manages video filtering, aspect ratio modes, and subtitle positioning for video playback.
+/// 管理视频滤镜、缩放模式和字幕位置的服务。
 ///
-/// This service handles:
-/// - BoxFit mode cycling (contain → cover → fill)
-/// - Video cropping calculations for fill screen mode
-/// - Subtitle positioning adjustments based on crop parameters
-/// - Debounced video filter updates on resize events
+/// 该服务处理：
+/// - 循环切换 BoxFit 模式 (包含 → 覆盖 → 填充)
+/// - 填充屏幕模式下的视频裁剪计算
+/// - 根据裁剪参数调整字幕位置
+/// - 调整大小时去抖动的视频滤镜更新
 class VideoFilterManager {
   final Player player;
   final List<PlexMediaVersion> availableVersions;
   final int selectedMediaIndex;
 
-  /// BoxFit mode state: 0=contain (letterbox), 1=cover (fill screen), 2=fill (stretch)
+  /// BoxFit 模式状态：0=包含 (信箱模式), 1=覆盖 (填充屏幕), 2=填充 (拉伸)
   int _boxFitMode = 0;
 
-  /// Track if a pinch gesture is occurring (public for gesture tracking)
+  /// 跟踪是否正在进行捏合手势 (公开用于手势跟踪)
   bool isPinching = false;
 
-  /// Current player viewport size
+  /// 当前播放器视口大小
   Size? _playerSize;
 
-  /// Debounced video filter update with leading edge execution
+  /// 带有领先执行的去抖动视频滤镜更新
   late final Debounce _debouncedUpdateVideoFilter;
 
   VideoFilterManager({required this.player, required this.availableVersions, required this.selectedMediaIndex}) {
@@ -39,27 +39,27 @@ class VideoFilterManager {
     );
   }
 
-  /// Current BoxFit mode (0=contain, 1=cover, 2=fill)
+  /// 当前 BoxFit 模式 (0=包含, 1=覆盖, 2=填充)
   int get boxFitMode => _boxFitMode;
 
-  /// Current player size
+  /// 当前播放器大小
   Size? get playerSize => _playerSize;
 
-  /// Cycle through BoxFit modes: contain → cover → fill → contain (for button)
+  /// 循环切换 BoxFit 模式：包含 → 覆盖 → 填充 → 包含 (用于按钮)
   void cycleBoxFitMode() {
     _boxFitMode = (_boxFitMode + 1) % 3;
     updateVideoFilter();
   }
 
-  /// Toggle between contain and cover modes only (for pinch gesture)
+  /// 仅在包含和覆盖模式之间切换 (用于捏合手势)
   void toggleContainCover() {
     _boxFitMode = _boxFitMode == 0 ? 1 : 0;
     updateVideoFilter();
   }
 
-  /// Update player size when layout changes
+  /// 当布局更改时更新播放器大小
   void updatePlayerSize(Size size) {
-    // Check if size actually changed to avoid unnecessary updates
+    // 检查大小是否真的改变，以避免不必要的更新
     if (_playerSize == null ||
         (_playerSize!.width - size.width).abs() > 0.1 ||
         (_playerSize!.height - size.height).abs() > 0.1) {
@@ -68,37 +68,37 @@ class VideoFilterManager {
     }
   }
 
-  /// Update the video scaling and positioning based on current display mode
+  /// 根据当前显示模式更新视频缩放和定位
   void updateVideoFilter() async {
     try {
-      // Clear all video filters and manual scaling first
+      // 首先清除所有视频滤镜和手动缩放
       await player.setProperty('video-aspect-override', 'no');
       await player.setProperty('sub-ass-force-margins', 'no');
       await player.setProperty('panscan', '0');
 
       if (_boxFitMode == 1) {
-        // Cover mode - use panscan to fill screen while maintaining aspect ratio
+        // 覆盖模式 - 使用 panscan 填充屏幕，同时保持纵横比
         await player.setProperty('panscan', '1.0');
         await player.setProperty('sub-ass-force-margins', 'yes');
       } else if (_boxFitMode == 2) {
-        // Fill/stretch mode - override aspect ratio to match player (stretches video)
+        // 填充/拉伸模式 - 覆盖纵横比以匹配播放器 (拉伸视频)
         if (_playerSize != null) {
           final playerAspect = _playerSize!.width / _playerSize!.height;
           await player.setProperty('video-aspect-override', playerAspect.toString());
-          appLogger.d('Stretch mode: aspect-override=$playerAspect (player: $_playerSize)');
+          appLogger.d('拉伸模式: aspect-override=$playerAspect (播放器: $_playerSize)');
         }
       }
     } catch (e) {
-      appLogger.w('Failed to update video filter', error: e);
+      appLogger.w('更新视频滤镜失败', error: e);
     }
   }
 
-  /// Debounced version of updateVideoFilter for resize events.
-  /// Uses leading-edge debounce: first call executes immediately,
-  /// subsequent calls within 50ms are debounced.
+  /// 调整大小事件的 updateVideoFilter 去抖动版本。
+  /// 使用领先执行去抖动：第一次调用立即执行，
+  /// 50ms 内的后续调用将被去抖动。
   void debouncedUpdateVideoFilter() => _debouncedUpdateVideoFilter();
 
-  /// Clean up resources
+  /// 清理资源
   void dispose() {
     _debouncedUpdateVideoFilter.cancel();
   }

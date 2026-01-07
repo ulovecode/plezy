@@ -2,11 +2,11 @@ import 'package:logger/logger.dart';
 
 import 'log_redaction_manager.dart';
 
-/// Redacts sensitive information from log messages based on known values.
+/// 根据已知值脱敏日志消息中的敏感信息。
 String _redactSensitiveData(String message) {
   var redacted = LogRedactionManager.redact(message);
 
-  // Fallbacks for sensitive fields we cannot track ahead of time.
+  // 对于无法提前追踪的敏感字段进行兜底处理。
   redacted = redacted.replaceAllMapped(
     RegExp(r'([Aa]uthorization[=:]\s*)([^\s,]+)'),
     (match) => '${match.group(1)}[REDACTED]',
@@ -20,7 +20,7 @@ String _redactSensitiveData(String message) {
   return redacted;
 }
 
-/// Represents a single log entry stored in memory
+/// 表示存储在内存中的单条日志条目
 class LogEntry {
   final DateTime timestamp;
   final Level level;
@@ -30,20 +30,20 @@ class LogEntry {
 
   LogEntry({required this.timestamp, required this.level, required this.message, this.error, this.stackTrace});
 
-  /// Estimate the memory size of this log entry in bytes
+  /// 估算此日志条目占用的内存大小（以字节为单位）
   int get estimatedSize {
     int size = 0;
-    // DateTime: ~8 bytes
+    // DateTime: ~8 字节
     size += 8;
-    // Level enum: ~4 bytes
+    // Level 枚举: ~4 字节
     size += 4;
-    // Message string: 2 bytes per character (UTF-16)
+    // 消息字符串: 每个字符 2 字节 (UTF-16)
     size += message.length * 2;
-    // Error string: 2 bytes per character if present
+    // 错误字符串: 如果存在，每个字符 2 字节
     if (error != null) {
       size += error.toString().length * 2;
     }
-    // Stack trace string: 2 bytes per character if present
+    // 堆栈轨迹字符串: 如果存在，每个字符 2 字节
     if (stackTrace != null) {
       size += stackTrace.toString().length * 2;
     }
@@ -51,37 +51,37 @@ class LogEntry {
   }
 }
 
-/// Custom log output that stores logs in memory with a circular buffer
+/// 自定义日志输出，使用循环缓冲区在内存中存储日志
 class MemoryLogOutput extends LogOutput {
   static const int maxLogSizeBytes = 5 * 1024 * 1024; // 5 MB
   static final List<LogEntry> _logs = [];
   static int _currentSize = 0;
 
-  /// Get all stored logs (newest first)
+  /// 获取所有存储的日志（最新的排在前面）
   static List<LogEntry> getLogs() => List.unmodifiable(_logs.reversed);
 
-  /// Clear all stored logs
+  /// 清除所有存储的日志
   static void clearLogs() {
     _logs.clear();
     _currentSize = 0;
   }
 
-  /// Get current log buffer size in bytes
+  /// 获取当前日志缓冲区的大小（字节）
   static int getCurrentSize() => _currentSize;
 
-  /// Get current log buffer size in MB
+  /// 获取当前日志缓冲区的大小（MB）
   static double getCurrentSizeMB() => _currentSize / (1024 * 1024);
 
   @override
   void output(OutputEvent event) {
-    // Extract relevant information from the log event
+    // 从日志事件中提取相关信息
     for (var line in event.lines) {
       final logEntry = LogEntry(timestamp: DateTime.now(), level: event.level, message: _redactSensitiveData(line));
 
       _logs.add(logEntry);
       _currentSize += logEntry.estimatedSize;
 
-      // Maintain buffer size limit (remove oldest entries)
+      // 维持缓冲区大小限制（移除最旧的条目）
       while (_currentSize > maxLogSizeBytes && _logs.isNotEmpty) {
         final removed = _logs.removeAt(0);
         _currentSize -= removed.estimatedSize;
@@ -90,7 +90,7 @@ class MemoryLogOutput extends LogOutput {
   }
 }
 
-/// Custom log printer that also stores error and stack trace information
+/// 自定义日志打印器，同时存储错误和堆栈轨迹信息
 class MemoryAwareLogPrinter extends LogPrinter {
   final LogPrinter _wrappedPrinter;
 
@@ -98,7 +98,7 @@ class MemoryAwareLogPrinter extends LogPrinter {
 
   @override
   List<String> log(LogEvent event) {
-    // Store the log with error and stack trace if available
+    // 如果可用，存储带有错误和堆栈轨迹的日志
     final message = _redactSensitiveData(event.message.toString());
     final error = event.error != null ? _redactSensitiveData(event.error.toString()) : null;
 
@@ -113,18 +113,18 @@ class MemoryAwareLogPrinter extends LogPrinter {
     MemoryLogOutput._logs.add(logEntry);
     MemoryLogOutput._currentSize += logEntry.estimatedSize;
 
-    // Maintain buffer size limit (remove oldest entries)
+    // 维持缓冲区大小限制（移除最旧的条目）
     while (MemoryLogOutput._currentSize > MemoryLogOutput.maxLogSizeBytes && MemoryLogOutput._logs.isNotEmpty) {
       final removed = MemoryLogOutput._logs.removeAt(0);
       MemoryLogOutput._currentSize -= removed.estimatedSize;
     }
 
-    // Delegate to wrapped printer for console output
+    // 委托给包装的打印器进行控制台输出
     return _wrappedPrinter.log(event);
   }
 }
 
-/// Custom production filter that respects our level setting even in release mode
+/// 自定义生产环境过滤器，即使在发布模式下也遵循我们的级别设置
 class ProductionFilter extends LogFilter {
   Level _currentLevel = Level.debug;
 
@@ -138,19 +138,19 @@ class ProductionFilter extends LogFilter {
   }
 }
 
-/// Global filter instance
+/// 全局过滤器实例
 final _productionFilter = ProductionFilter();
 
-/// Centralized logger instance for the application.
+/// 应用程序的中心化日志实例。
 ///
-/// Usage:
+/// 用法:
 /// ```dart
 /// import 'package:plezy/utils/app_logger.dart';
 ///
-/// appLogger.d('Debug message');
-/// appLogger.i('Info message');
-/// appLogger.w('Warning message');
-/// appLogger.e('Error message', error: e, stackTrace: stackTrace);
+/// appLogger.d('调试消息');
+/// appLogger.i('信息消息');
+/// appLogger.w('警告消息');
+/// appLogger.e('错误消息', error: e, stackTrace: stackTrace);
 /// ```
 Logger appLogger = Logger(
   printer: MemoryAwareLogPrinter(SimplePrinter()),
@@ -158,18 +158,18 @@ Logger appLogger = Logger(
   level: Level.debug,
 );
 
-/// Update the logger's level dynamically based on debug setting
-/// Recreates the logger instance to ensure it works in release mode
+/// 根据调试设置动态更新日志记录器的级别
+/// 重新创建日志记录器实例以确保它在发布模式下也能工作
 void setLoggerLevel(bool debugEnabled) {
   final newLevel = debugEnabled ? Level.debug : Level.info;
 
-  // Update the filter level
+  // 更新过滤器级别
   _productionFilter.setLevel(newLevel);
 
-  // Recreate the logger instance with the new level
-  // This ensures it works in release mode where Logger.level might be optimized away
+  // 使用新级别重新创建日志记录器实例
+  // 这确保了它在发布模式下也能工作，因为在发布模式下 Logger.level 可能会被优化掉
   appLogger = Logger(printer: MemoryAwareLogPrinter(SimplePrinter()), filter: _productionFilter, level: newLevel);
 
-  // Also set the static level for consistency
+  // 同时设置静态级别以保持一致性
   Logger.level = newLevel;
 }

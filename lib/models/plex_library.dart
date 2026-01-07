@@ -17,7 +17,7 @@ class PlexLibrary with MultiServerFields {
   final int? createdAt;
   final int? hidden;
 
-  // Multi-server support fields (from MultiServerFields mixin)
+  // 多服务器支持字段（来自 MultiServerFields 混入）
   @override
   @JsonKey(includeFromJson: false, includeToJson: false)
   final String? serverId;
@@ -25,7 +25,7 @@ class PlexLibrary with MultiServerFields {
   @JsonKey(includeFromJson: false, includeToJson: false)
   final String? serverName;
 
-  /// Global unique identifier across all servers (serverId:key)
+  /// 跨所有服务器的全局唯一标识符 (serverId:key)
   String get globalKey => serverId != null ? '$serverId:$key' : key;
 
   PlexLibrary({
@@ -47,7 +47,7 @@ class PlexLibrary with MultiServerFields {
 
   Map<String, dynamic> toJson() => _$PlexLibraryToJson(this);
 
-  /// Create a copy of this library with optional field overrides
+  /// 创建此库的一个副本，并可选地覆盖字段
   PlexLibrary copyWith({
     String? key,
     String? title,

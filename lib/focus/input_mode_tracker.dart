@@ -4,21 +4,21 @@ import 'package:flutter/services.dart';
 import '../utils/platform_detector.dart';
 import '../services/gamepad_service.dart';
 
-/// Tracks whether the user is navigating via keyboard/d-pad or pointer (mouse/touch).
+/// 跟踪用户是通过键盘/D-pad 还是通过指针（鼠标/触摸）进行导航。
 ///
-/// Focus effects should only be shown during keyboard navigation.
+/// 焦点效果应仅在键盘导航期间显示。
 enum InputMode { keyboard, pointer }
 
-/// Provides input mode tracking to descendant widgets.
+/// 向后代小部件提供输入模式跟踪。
 ///
-/// Wrap your app with this widget to enable input mode detection:
+/// 使用此小部件包装你的应用程序以启用输入模式检测：
 /// ```dart
 /// InputModeTracker(
 ///   child: MaterialApp(...),
 /// )
 /// ```
 ///
-/// Then check the mode in focusable widgets:
+/// 然后在可聚焦的小部件中检查模式：
 /// ```dart
 /// final showFocus = _isFocused && InputModeTracker.isKeyboardMode(context);
 /// ```
@@ -27,13 +27,13 @@ class InputModeTracker extends StatefulWidget {
 
   const InputModeTracker({super.key, required this.child});
 
-  /// Get the current input mode.
+  /// 获取当前的输入模式。
   static InputMode of(BuildContext context) {
     final provider = context.dependOnInheritedWidgetOfExactType<_InputModeProvider>();
     return provider?.mode ?? InputMode.pointer;
   }
 
-  /// Convenience method to check if we're in keyboard mode.
+  /// 检查是否处于键盘模式的便捷方法。
   static bool isKeyboardMode(BuildContext context) {
     return of(context) == InputMode.keyboard;
   }
@@ -43,18 +43,18 @@ class InputModeTracker extends StatefulWidget {
 }
 
 class _InputModeTrackerState extends State<InputModeTracker> {
-  // Default to keyboard mode on Android TV, pointer mode elsewhere
+  // 在 Android TV 上默认为键盘模式，其他地方默认为指针模式
   InputMode _mode = TvDetectionService.isTVSync() ? InputMode.keyboard : InputMode.pointer;
 
   @override
   void initState() {
     super.initState();
-    // Initialize focus highlight strategy based on starting mode
+    // 根据起始模式初始化焦点高亮策略
     _updateFocusHighlightStrategy(_mode);
-    // Listen to hardware keyboard events globally
+    // 全局监听硬件键盘事件
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
 
-    // Register callback for gamepad input to switch to keyboard mode
+    // 注册游戏手柄输入的回调以切换到键盘模式
     GamepadService.onGamepadInput = () => _setMode(InputMode.keyboard);
   }
 
@@ -66,11 +66,11 @@ class _InputModeTrackerState extends State<InputModeTracker> {
   }
 
   bool _handleKeyEvent(KeyEvent event) {
-    // Only switch to keyboard mode on key down (not repeats or releases)
+    // 仅在按下按键时切换到键盘模式（不包括重复或释放）
     if (event is KeyDownEvent) {
       _setMode(InputMode.keyboard);
     }
-    // Return false to let the event continue propagating
+    // 返回 false 以让事件继续传播
     return false;
   }
 
@@ -81,8 +81,8 @@ class _InputModeTrackerState extends State<InputModeTracker> {
     _updateFocusHighlightStrategy(mode);
   }
 
-  // Keep Material focus highlights in sync with our input mode so keyboard/gamepad
-  // navigation immediately shows focus without waiting for a real keypress.
+  // 保持 Material 焦点高亮与我们的输入模式同步，
+  // 以便键盘/游戏手柄导航能立即显示焦点，而无需等待真实的按键操作。
   void _updateFocusHighlightStrategy(InputMode mode) {
     final desiredStrategy = mode == InputMode.keyboard
         ? FocusHighlightStrategy.alwaysTraditional
@@ -95,15 +95,15 @@ class _InputModeTrackerState extends State<InputModeTracker> {
 
   @override
   Widget build(BuildContext context) {
-    // On Android TV, don't switch to pointer mode from pointer events
-    // as D-pad can generate synthetic pointer events that would incorrectly
-    // trigger pointer mode and show a cursor instead of D-pad focus navigation
+    // 在 Android TV 上，不要从指针事件切换到指针模式，
+    // 因为 D-pad 可能会生成合成的指针事件，这会错误地触发指针模式并显示光标，
+    // 而不是 D-pad 焦点导航。
     if (TvDetectionService.isTVSync()) {
       return _InputModeProvider(mode: _mode, child: widget.child);
     }
 
     return Listener(
-      // Switch to pointer mode on mouse activity
+      // 在鼠标活动时切换到指针模式
       onPointerDown: (_) => _setMode(InputMode.pointer),
       onPointerHover: (_) => _setMode(InputMode.pointer),
       behavior: HitTestBehavior.translucent,
@@ -112,7 +112,7 @@ class _InputModeTrackerState extends State<InputModeTracker> {
   }
 }
 
-/// InheritedWidget that provides the current input mode.
+/// 提供当前输入模式的 InheritedWidget。
 class _InputModeProvider extends InheritedWidget {
   final InputMode mode;
 

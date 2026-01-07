@@ -3,7 +3,7 @@ import 'plex_metadata.dart';
 
 part 'play_queue_response.g.dart';
 
-/// Converter to handle both int (0/1) and bool values from Plex API
+/// 用于处理来自 Plex API 的 int (0/1) 和 bool 值的转换器
 class BoolOrIntConverter implements JsonConverter<bool, Object> {
   const BoolOrIntConverter();
 
@@ -19,8 +19,8 @@ class BoolOrIntConverter implements JsonConverter<bool, Object> {
   Object toJson(bool object) => object;
 }
 
-/// Response from Plex play queue API
-/// Contains queue metadata and a window of items
+/// 来自 Plex 播放队列（Play Queue）API 的响应
+/// 包含队列元数据和一组项目
 @JsonSerializable(createToJson: false)
 class PlayQueueResponse {
   final int playQueueID;
@@ -32,7 +32,7 @@ class PlayQueueResponse {
   final String? playQueueSourceURI;
   final int? playQueueTotalCount;
   final int playQueueVersion;
-  final int? size; // Number of items in this response window
+  final int? size; // 此响应窗口中的项目数
   @JsonKey(name: 'Metadata')
   final List<PlexMetadata>? items;
 
@@ -50,11 +50,11 @@ class PlayQueueResponse {
   });
 
   factory PlayQueueResponse.fromJson(Map<String, dynamic> json, {String? serverId, String? serverName}) {
-    // The API returns data wrapped in MediaContainer
+    // API 返回的数据包装在 MediaContainer 中
     final container = json['MediaContainer'] as Map<String, dynamic>? ?? json;
     final response = _$PlayQueueResponseFromJson(container);
 
-    // Tag all items with server info
+    // 为所有项目标记服务器信息
     if (response.items != null && (serverId != null || serverName != null)) {
       final taggedItems = response.items!
           .map((item) => item.copyWith(serverId: serverId, serverName: serverName))
@@ -76,7 +76,7 @@ class PlayQueueResponse {
     return response;
   }
 
-  /// Get the current selected item from the queue
+  /// 获取队列中当前选中的项目
   PlexMetadata? get selectedItem {
     if (items == null || playQueueSelectedItemID == null) return null;
     try {
@@ -86,7 +86,7 @@ class PlayQueueResponse {
     }
   }
 
-  /// Get the index of the selected item in the current window
+  /// 获取选中项目在当前窗口中的索引
   int? get selectedItemIndex {
     if (items == null || playQueueSelectedItemID == null) return null;
     return items!.indexWhere((item) => item.playQueueItemID == playQueueSelectedItemID);

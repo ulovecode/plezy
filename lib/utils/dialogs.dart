@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../i18n/strings.g.dart';
 
-/// Utility functions for showing common dialogs
+/// 显示常用对话框的工具函数
 
-/// Shows a delete confirmation dialog
-/// Returns true if user confirmed, false if cancelled
+/// 显示删除确认对话框
+/// 如果用户确认则返回 true，如果取消则返回 false
 Future<bool> showDeleteConfirmation(BuildContext context, {required String title, required String message}) async {
   final confirmed = await showDialog<bool>(
     context: context,
@@ -25,8 +25,8 @@ Future<bool> showDeleteConfirmation(BuildContext context, {required String title
   return confirmed ?? false;
 }
 
-/// Shows a text input dialog for creating/naming items
-/// Returns the entered text, or null if cancelled
+/// 显示用于创建/命名项目的文本输入对话框
+/// 返回输入的文本，如果取消则返回 null
 Future<String?> showTextInputDialog(
   BuildContext context, {
   required String title,

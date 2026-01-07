@@ -2,7 +2,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:window_manager/window_manager.dart';
 
-/// Global manager for tracking fullscreen state across the app
+/// 用于在整个应用中跟踪全屏状态的全局管理器
 class FullscreenStateManager extends ChangeNotifier with WindowListener {
   static final FullscreenStateManager _instance = FullscreenStateManager._internal();
 
@@ -15,7 +15,7 @@ class FullscreenStateManager extends ChangeNotifier with WindowListener {
 
   bool get isFullscreen => _isFullscreen;
 
-  /// Manually set fullscreen state (called by NSWindowDelegate callbacks on macOS)
+  /// 手动设置全屏状态 (由 macOS 上的 NSWindowDelegate 回调调用)
   void setFullscreen(bool value) {
     if (_isFullscreen != value) {
       _isFullscreen = value;
@@ -23,19 +23,19 @@ class FullscreenStateManager extends ChangeNotifier with WindowListener {
     }
   }
 
-  /// Start monitoring fullscreen state
+  /// 开始监控全屏状态
   void startMonitoring() {
     if (!_shouldMonitor() || _isListening) return;
 
-    // Use window_manager listener for Windows/Linux
-    // macOS uses NSWindowDelegate callbacks instead (see FullscreenWindowDelegate)
+    // Windows/Linux 使用 window_manager 监听器
+    // macOS 则使用 NSWindowDelegate 回调 (见 FullscreenWindowDelegate)
     if (!Platform.isMacOS) {
       windowManager.addListener(this);
       _isListening = true;
     }
   }
 
-  /// Stop monitoring fullscreen state
+  /// 停止监控全屏状态
   void stopMonitoring() {
     if (_isListening) {
       windowManager.removeListener(this);
@@ -47,7 +47,7 @@ class FullscreenStateManager extends ChangeNotifier with WindowListener {
     return Platform.isMacOS || Platform.isWindows || Platform.isLinux;
   }
 
-  // WindowListener callbacks for Windows/Linux
+  // Windows/Linux 的 WindowListener 回调
   @override
   void onWindowEnterFullScreen() {
     setFullscreen(true);

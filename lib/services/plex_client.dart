@@ -22,14 +22,14 @@ import '../utils/plex_cache_parser.dart';
 import '../utils/plex_url_helper.dart';
 import 'plex_api_cache.dart';
 
-/// Constants for Plex stream types
+/// Plex 流类型的常量
 class PlexStreamType {
   static const int video = 1;
   static const int audio = 2;
   static const int subtitle = 3;
 }
 
-/// Result of testing a connection, including success status and latency
+/// 测试连接的结果，包括成功状态和延迟
 class ConnectionTestResult {
   final bool success;
   final int latencyMs;
@@ -37,33 +37,49 @@ class ConnectionTestResult {
   ConnectionTestResult({required this.success, required this.latencyMs});
 }
 
+/// Plex 客户端类，负责与 Plex 媒体服务器 (PMS) 进行所有的 API 交互。
+///
+/// 该类集成了以下核心功能：
+/// 1. **身份验证与配置**：管理服务器 URL、Token 以及基础请求头。
+/// 2. **自动故障转移 (Failover)**：当主连接失败时，自动尝试备用端点（如局域网 IP 与远程 URL 切换）。
+/// 3. **离线支持**：内置 API 响应缓存层 ([PlexApiCache])，支持离线模式下的元数据浏览。
+/// 4. **响应解析与数据标记**：将原始 JSON 转换为强类型的模型对象，并自动标记服务器 ID。
+/// 5. **连接测试**：测量连接延迟并选择最优端点。
 class PlexClient {
+  /// 当前客户端使用的 Plex 配置信息
   PlexConfig config;
+
+  /// 用于发起 HTTP 请求的 Dio 实例
   late final Dio _dio;
+
+  /// 负责管理多个备用连接端点的故障转移管理器
   final EndpointFailoverManager? _endpointManager;
+
+  /// 当检测到更优端点并发生切换时的回调函数
   final Future<void> Function(String newBaseUrl)? _onEndpointChanged;
 
-  /// Server identifier - all PlexMetadata items created by this client are tagged with this
+  /// 服务器的唯一标识符（Machine Identifier）
+  /// 由此客户端创建的所有 [PlexMetadata] 都会标记此 ID。
   final String serverId;
 
-  /// Server name - all PlexMetadata items created by this client are tagged with this
+  /// 服务器的显示名称
   final String? serverName;
 
-  /// API response cache for offline support
+  /// API 响应缓存实例，用于支持离线浏览
   final PlexApiCache _cache = PlexApiCache.instance;
 
-  /// Whether to operate in offline mode (use cache only)
+  /// 是否处于离线模式（仅使用缓存数据）
   bool _offlineMode = false;
 
-  /// Set offline mode - when true, only cached responses are returned
+  /// 设置离线模式。开启后，所有请求将直接从本地缓存读取。
   void setOfflineMode(bool offline) {
     _offlineMode = offline;
   }
 
-  /// Get current offline mode state
+  /// 获取当前是否处于离线模式
   bool get isOfflineMode => _offlineMode;
 
-  /// Custom response decoder that handles malformed UTF-8 gracefully
+  /// 自定义响应解码器，用于优雅地处理格式错误的 UTF-8 字符（常见于某些元数据）
   static String _lenientUtf8Decoder(List<int> responseBytes, RequestOptions options, ResponseBody responseBody) {
     return utf8.decode(responseBytes, allowMalformed: true);
   }
@@ -78,6 +94,7 @@ class PlexClient {
            ? EndpointFailoverManager(prioritizedEndpoints)
            : null,
        _onEndpointChanged = onEndpointChanged {
+    // 注册敏感信息到日志脱敏管理器
     LogRedactionManager.registerServerUrl(config.baseUrl);
     LogRedactionManager.registerToken(config.token);
 
@@ -94,11 +111,12 @@ class PlexClient {
       ),
     );
 
-    // Add interceptor for logging (optional, can be disabled in production)
+    // 添加日志拦截器（仅在调试时有用）
     _dio.interceptors.add(
       LogInterceptor(requestBody: false, responseBody: false, error: true, requestHeader: false, responseHeader: false),
     );
 
+    // 如果提供了备用端点，则添加故障转移拦截器
     if (_endpointManager != null) {
       _dio.interceptors.add(
         EndpointFailoverInterceptor(
@@ -110,16 +128,16 @@ class PlexClient {
     }
   }
 
-  /// Update the token used by this client
+  /// 更新客户端使用的 Token
   void updateToken(String newToken) {
-    // Update both the Dio headers and the config to ensure consistency
+    // 同时更新 Dio 请求头和内部配置，确保一致性
     _dio.options.headers['X-Plex-Token'] = newToken;
     config = config.copyWith(token: newToken);
     LogRedactionManager.registerToken(newToken);
     appLogger.d('PlexClient token updated (headers and config)');
   }
 
-  /// Update endpoint priority list and optionally hop to the new best endpoint.
+  /// 更新端点优先级列表，并可选地立即切换到最优端点
   Future<void> updateEndpointPreferences(List<String> prioritizedEndpoints, {bool switchToFirst = false}) async {
     if (_endpointManager == null || prioritizedEndpoints.isEmpty) {
       return;
@@ -133,7 +151,7 @@ class PlexClient {
     }
   }
 
-  /// Test connection to server
+  /// 测试与服务器的连接是否通畅
   Future<bool> testConnection() async {
     try {
       final response = await _dio.get('/');
@@ -143,7 +161,7 @@ class PlexClient {
     }
   }
 
-  /// Test connection to a specific URL with token and measure latency
+  /// 测试指定 URL 的连接状况并测量延迟
   static Future<ConnectionTestResult> testConnectionWithLatency(
     String baseUrl,
     String token, {
@@ -175,7 +193,7 @@ class PlexClient {
     }
   }
 
-  /// Test connection multiple times and return average latency
+  /// 多次测试连接并返回平均延迟，用于更准确地评估端点质量
   static Future<ConnectionTestResult> testConnectionWithAverageLatency(
     String baseUrl,
     String token, {
@@ -187,7 +205,7 @@ class PlexClient {
     for (int i = 0; i < attempts; i++) {
       final result = await testConnectionWithLatency(baseUrl, token, timeout: timeout);
 
-      // If any attempt fails, return failed result immediately
+      // 只要有一次尝试失败，就立即返回失败结果
       if (!result.success) {
         return ConnectionTestResult(success: false, latencyMs: result.latencyMs);
       }
@@ -195,17 +213,17 @@ class PlexClient {
       results.add(result);
     }
 
-    // Calculate average latency from successful attempts
+    // 计算所有成功尝试的平均延迟
     final avgLatency = results.fold<int>(0, (sum, result) => sum + result.latencyMs) ~/ results.length;
 
     return ConnectionTestResult(success: true, latencyMs: avgLatency);
   }
 
   // ============================================================================
-  // API Response Parsing Helpers
+  // API 响应解析助手
   // ============================================================================
 
-  /// Extract MediaContainer from API response
+  /// 从 API 响应中提取 MediaContainer 对象
   Map<String, dynamic>? _getMediaContainer(Response response) {
     if (response.data is Map && response.data.containsKey('MediaContainer')) {
       return response.data['MediaContainer'];
@@ -213,14 +231,14 @@ class PlexClient {
     return null;
   }
 
-  /// Tag a PlexMetadata with this client's serverId and serverName
+  /// 为 [PlexMetadata] 标记当前客户端的 serverId 和 serverName
   PlexMetadata _tagMetadata(PlexMetadata metadata) => metadata.copyWith(serverId: serverId, serverName: serverName);
 
-  /// Create and tag a PlexMetadata from JSON
+  /// 从 JSON 创建并标记 [PlexMetadata]
   PlexMetadata _createTaggedMetadata(Map<String, dynamic> json) => _tagMetadata(PlexMetadata.fromJson(json));
 
-  /// Extract list of PlexMetadata from response
-  /// Automatically tags all items with this client's serverId and serverName
+  /// 从响应中提取 [PlexMetadata] 列表
+  /// 自动为所有项目标记当前客户端的 serverId 和 serverName
   List<PlexMetadata> _extractMetadataList(Response response) {
     final container = _getMediaContainer(response);
     if (container != null && container['Metadata'] != null) {
@@ -229,7 +247,7 @@ class PlexClient {
     return [];
   }
 
-  /// Extract first metadata JSON from response (returns raw Map or null)
+  /// 从响应中提取第一个元数据 JSON（返回原始 Map 或 null）
   Map<String, dynamic>? _getFirstMetadataJson(Response response) {
     final container = _getMediaContainer(response);
     if (container != null && container['Metadata'] != null && (container['Metadata'] as List).isNotEmpty) {
@@ -238,7 +256,7 @@ class PlexClient {
     return null;
   }
 
-  /// Generic helper to extract and map Directory list from response
+  /// 通用的 Directory 列表提取与转换助手
   List<T> _extractDirectoryList<T>(Response response, T Function(Map<String, dynamic>) fromJson) {
     final container = _getMediaContainer(response);
     if (container != null && container['Directory'] != null) {
@@ -247,7 +265,7 @@ class PlexClient {
     return [];
   }
 
-  /// Extract PlexLibrary list from response with auto-tagging
+  /// 从响应中提取 [PlexLibrary] 列表并自动标记服务器信息
   List<PlexLibrary> _extractLibraryList(Response response) {
     final container = _getMediaContainer(response);
     if (container != null && container['Directory'] != null) {
@@ -261,7 +279,7 @@ class PlexClient {
     return [];
   }
 
-  /// Extract PlexPlaylist list from response with auto-tagging
+  /// 从响应中提取 [PlexPlaylist] 列表并自动标记服务器信息
   List<PlexPlaylist> _extractPlaylistList(Response response) {
     final container = _getMediaContainer(response);
     if (container != null && container['Metadata'] != null) {
@@ -277,23 +295,23 @@ class PlexClient {
   }
 
   // ============================================================================
-  // API Methods
+  // API 方法
   // ============================================================================
 
-  /// Get server identity
+  /// 获取服务器标识信息
   Future<Map<String, dynamic>> getServerIdentity() async {
     final response = await _dio.get('/identity');
     return response.data;
   }
 
-  /// Get library sections
-  /// Returns libraries automatically tagged with this client's serverId and serverName
+  /// 获取媒体库列表
+  /// 返回自动标记了 serverId 和 serverName 的媒体库
   Future<List<PlexLibrary>> getLibraries() async {
     final response = await _dio.get('/library/sections');
     return _extractLibraryList(response);
   }
 
-  /// Get library content by section ID
+  /// 根据媒体库 ID 获取其内容
   Future<List<PlexMetadata>> getLibraryContent(
     String sectionId, {
     int? start,
@@ -305,7 +323,7 @@ class PlexClient {
     if (start != null) queryParams['X-Plex-Container-Start'] = start;
     if (size != null) queryParams['X-Plex-Container-Size'] = size;
 
-    // Add filter parameters
+    // 添加筛选参数
     if (filters != null) {
       queryParams.addAll(filters);
     }
@@ -319,7 +337,7 @@ class PlexClient {
     return _extractMetadataList(response);
   }
 
-  /// Parse list of PlexMetadata from a cached response
+  /// 从缓存响应中解析 [PlexMetadata] 列表
   List<PlexMetadata> _parseMetadataListFromCachedResponse(Map<String, dynamic> cached) {
     final metadataList = PlexCacheParser.extractMetadataList(cached);
     if (metadataList != null) {
@@ -328,7 +346,7 @@ class PlexClient {
     return [];
   }
 
-  /// Get the server's machine identifier
+  /// 获取服务器的机器标识符 (Machine Identifier)
   Future<String?> getMachineIdentifier() async {
     try {
       final response = await _dio.get('/');
@@ -341,10 +359,10 @@ class PlexClient {
     }
   }
 
-  /// Build a proper metadata URI for adding to playlists
-  /// Returns URI in format: server://{machineId}/com.plexapp.plugins.library/library/metadata/{ratingKey}
+  /// 构建用于添加到播放列表的元数据 URI
+  /// 返回格式：server://{machineId}/com.plexapp.plugins.library/library/metadata/{ratingKey}
   Future<String> buildMetadataUri(String ratingKey) async {
-    // Use cached machine identifier from config if available
+    // 优先从配置中使用缓存的 machineIdentifier
     final machineId = config.machineIdentifier ?? await getMachineIdentifier();
     if (machineId == null) {
       throw Exception('Could not get server machine identifier');
@@ -352,16 +370,15 @@ class PlexClient {
     return 'server://$machineId/com.plexapp.plugins.library/library/metadata/$ratingKey';
   }
 
-  /// Get metadata by rating key with images (includes clearLogo and OnDeck)
-  /// Uses cache when offline or as fallback on network error
-  /// Note: OnDeck data is not relevant for offline mode
-  /// Always fetches with chapters/markers but caches at base endpoint
+  /// 获取元数据，包含图片（clearLogo）和 OnDeck（在播）信息
+  /// 离线时使用缓存，或作为网络错误的备选
+  /// 注意：OnDeck 数据在离线模式下不适用
   Future<Map<String, dynamic>> getMetadataWithImagesAndOnDeck(String ratingKey) async {
-    // Cache key is always the base endpoint (no query params)
+    // 缓存键始终为基础端点（不含查询参数）
     final cacheKey = '/library/metadata/$ratingKey';
 
-    // Special handling needed for OnDeck - can't use simple _fetchWithCacheFallback
-    // because OnDeck is only available from network response, not cache
+    // OnDeck 需要特殊处理 - 不能简单使用 _fetchWithCacheFallback，
+    // 因为 OnDeck 仅在网络响应中可用，缓存中通常不存储这部分动态数据。
     return await _fetchWithCacheFallback<Map<String, dynamic>>(
           cacheKey: cacheKey,
           networkCall: () => _dio.get(
@@ -381,11 +398,11 @@ class PlexClient {
             if (metadataJson != null) {
               metadata = _tagMetadata(PlexMetadata.fromJsonWithImages(metadataJson));
 
-              // Check if OnDeck is nested inside Metadata
+              // 检查 Metadata 中是否嵌套了 OnDeck 信息
               if (metadataJson.containsKey('OnDeck') && metadataJson['OnDeck'] != null) {
                 final onDeckData = metadataJson['OnDeck'];
 
-                // OnDeck can be either a Map with 'Metadata' key or direct metadata
+                // OnDeck 可以是包含 'Metadata' 键的 Map，也可以是直接的元数据
                 if (onDeckData is Map && onDeckData.containsKey('Metadata')) {
                   final onDeckMetadata = onDeckData['Metadata'];
                   if (onDeckMetadata != null) {
@@ -401,11 +418,9 @@ class PlexClient {
         {'metadata': null, 'onDeckEpisode': null};
   }
 
-  /// Get metadata by rating key with images (includes clearLogo)
-  /// Uses cache when offline or as fallback on network error
-  /// Always fetches with chapters/markers but caches at base endpoint
+  /// 获取元数据，包含图片（clearLogo）
+  /// 离线时使用缓存，或作为网络错误的备选
   Future<PlexMetadata?> getMetadataWithImages(String ratingKey) async {
-    // Cache key is always the base endpoint (no query params)
     final cacheKey = '/library/metadata/$ratingKey';
 
     return _fetchWithCacheFallback<PlexMetadata>(
@@ -420,7 +435,7 @@ class PlexClient {
     );
   }
 
-  /// Parse PlexMetadata with images from a cached response
+  /// 从缓存响应中解析带图片的 [PlexMetadata]
   PlexMetadata? _parseMetadataWithImagesFromCachedResponse(Map<String, dynamic> cached) {
     final firstMetadata = PlexCacheParser.extractFirstMetadata(cached);
     if (firstMetadata != null) {
@@ -429,43 +444,42 @@ class PlexClient {
     return null;
   }
 
-  /// Fetch metadata with cache support for offline mode and network fallback.
+  /// 带有缓存支持的元数据获取，用于播放逻辑
   ///
-  /// Returns the raw response data (Map) or null if not available.
-  /// Used by playback methods to share caching logic.
+  /// 返回原始响应数据 (Map) 或 null。
   Future<Map<String, dynamic>?> _fetchMetadataWithCache(String ratingKey, {Map<String, dynamic>? queryParams}) async {
     final cacheKey = '/library/metadata/$ratingKey';
 
-    // Offline mode: cache only
+    // 离线模式：仅使用缓存
     if (_offlineMode) {
       return await _cache.get(serverId, cacheKey);
     }
 
-    // Online: try network first
+    // 在线：优先尝试网络
     try {
       final response = await _dio.get('/library/metadata/$ratingKey', queryParameters: queryParams);
 
-      // Cache at base endpoint
+      // 将响应缓存到基础端点
       if (response.data != null) {
         await _cache.put(serverId, cacheKey, response.data);
       }
 
       return response.data;
     } catch (e) {
-      // Network failed - try cache as fallback
+      // 网络失败 - 尝试缓存作为备选
       appLogger.w('Network request failed for metadata, trying cache', error: e);
       return await _cache.get(serverId, cacheKey);
     }
   }
 
-  /// Generic cache-network-fallback helper for fetching data
+  /// 通用的“网络优先，缓存备选”助手方法
   ///
-  /// This method implements the standard pattern used throughout the client:
-  /// 1. If offline mode is enabled, return cached data only
-  /// 2. Otherwise, try network request first
-  /// 3. If network succeeds and cacheResponse is true, cache the response
-  /// 4. If network fails, fall back to cached data
-  /// 5. If no cached data available, rethrow the network error
+  /// 实现了客户端通用的数据获取模式：
+  /// 1. 如果开启了离线模式，仅返回缓存数据。
+  /// 2. 否则，优先发起网络请求。
+  /// 3. 如果请求成功且 cacheResponse 为 true，则缓存该响应。
+  /// 4. 如果请求失败，回退到本地缓存。
+  /// 5. 如果缓存也没有，则重新抛出网络异常。
   Future<T?> _fetchWithCacheFallback<T>({
     required String cacheKey,
     required Future<Response> Function() networkCall,
@@ -492,11 +506,11 @@ class PlexClient {
     }
   }
 
-  /// Get first metadata JSON from response data
+  /// 获取响应数据中的第一个元数据 JSON
   Map<String, dynamic>? _getFirstMetadataJsonFromData(Map<String, dynamic>? data) =>
       PlexCacheParser.extractFirstMetadata(data);
 
-  /// Wraps an API call that returns a boolean success status
+  /// 包装返回布尔状态的 API 调用
   Future<bool> _wrapBoolApiCall(Future<Response> Function() apiCall, String errorMessage) async {
     try {
       final response = await apiCall();
@@ -507,7 +521,7 @@ class PlexClient {
     }
   }
 
-  /// Wraps an API call that returns a list, returning empty list on error
+  /// 包装返回列表的 API 调用，出错时返回空列表
   Future<List<T>> _wrapListApiCall<T>(
     Future<Response> Function() apiCall,
     List<T> Function(Response response) parseResponse,
@@ -522,7 +536,7 @@ class PlexClient {
     }
   }
 
-  /// Parse audio and subtitle tracks from a stream list
+  /// 从流列表中解析音频和字幕轨道
   ({List<PlexAudioTrack> audio, List<PlexSubtitleTrack> subtitles}) _parseStreams(List<dynamic>? streams) {
     final audioTracks = <PlexAudioTrack>[];
     final subtitleTracks = <PlexSubtitleTrack>[];
@@ -567,7 +581,7 @@ class PlexClient {
     return (audio: audioTracks, subtitles: subtitleTracks);
   }
 
-  /// Parse chapters from metadata JSON
+  /// 从元数据 JSON 中解析章节信息
   List<PlexChapter> _parseChapters(Map<String, dynamic>? metadataJson) {
     if (metadataJson == null || metadataJson['Chapter'] == null) {
       return [];
@@ -586,9 +600,9 @@ class PlexClient {
     }).toList();
   }
 
-  /// Set per-media language preferences (audio and subtitle)
-  /// For TV shows, use grandparentRatingKey to set preference for the entire series
-  /// For movies, use the movie's ratingKey
+  /// 设置媒体的语言偏好（音频和字幕）
+  /// 对于电视剧，建议使用 grandparentRatingKey 来为整个系列设置偏好
+  /// 对于电影，使用其 ratingKey
   Future<bool> setMetadataPreferences(String ratingKey, {String? audioLanguage, String? subtitleLanguage}) async {
     final queryParams = <String, dynamic>{};
     if (audioLanguage != null) {
@@ -598,7 +612,7 @@ class PlexClient {
       queryParams['subtitleLanguage'] = subtitleLanguage;
     }
 
-    // If no preferences to set, return early
+    // 如果没有偏好需要设置，直接返回
     if (queryParams.isEmpty) {
       return true;
     }
@@ -609,9 +623,8 @@ class PlexClient {
     );
   }
 
-  /// Select specific audio and subtitle streams for playback
-  /// This updates which streams are "selected" in the media metadata
-  /// Uses the part ID from media info for accurate stream selection
+  /// 为播放选择特定的音频和字幕流
+  /// 这会更新媒体元数据中哪些流被标记为“已选择”
   Future<bool> selectStreams(int partId, {int? audioStreamID, int? subtitleStreamID, bool allParts = true}) async {
     final queryParams = <String, dynamic>{};
     if (audioStreamID != null) {
@@ -621,24 +634,22 @@ class PlexClient {
       queryParams['subtitleStreamID'] = subtitleStreamID;
     }
     if (allParts) {
-      // If no streams to select, return early
+      // 如果没有流需要选择，直接返回
       if (queryParams.isEmpty) {
         return true;
       }
 
-      // Use PUT request on /library/parts/{partId}
+      // 对 /library/parts/{partId} 发起 PUT 请求
       return _wrapBoolApiCall(
         () => _dio.put('/library/parts/$partId', queryParameters: queryParams),
         'Failed to select streams',
       );
     }
-    // Si allParts est false, retourner true ou false explicitement (selon la logique souhaitée)
-    // Ici, on retourne true par défaut si rien n'est fait
     return true;
   }
 
-  /// Search across all libraries using the hub search endpoint
-  /// Only returns movies and shows, filtering out seasons and episodes
+  /// 在所有媒体库中进行搜索（使用 hub 搜索端点）
+  /// 仅返回电影和剧集，过滤掉季和单集
   Future<List<PlexMetadata>> search(String query, {int limit = 10}) async {
     final response = await _dio.get(
       '/hubs/search',
@@ -650,22 +661,22 @@ class PlexClient {
     final container = _getMediaContainer(response);
     if (container != null) {
       if (container['Hub'] != null) {
-        // Each hub contains results of a specific type (movies, shows, etc.)
+        // 每个 Hub 包含特定类型的结果（电影、剧集等）
         for (final hub in container['Hub'] as List) {
           final hubType = hub['type'] as String?;
 
-          // Only include movie and show hubs
+          // 仅包含电影和剧集 Hub
           if (hubType != 'movie' && hubType != 'show') {
             continue;
           }
 
-          // Hubs can contain either Metadata (for movies) or Directory (for shows)
+          // Hub 可以包含 Metadata（电影）或 Directory（剧集）
           if (hub['Metadata'] != null) {
             for (final json in hub['Metadata'] as List) {
               try {
                 results.add(_createTaggedMetadata(json));
               } catch (e) {
-                // Skip items that fail to parse
+                // 跳过解析失败的项目
                 appLogger.w('Failed to parse search result', error: e);
                 appLogger.d('Problematic JSON: $json');
               }
@@ -676,7 +687,7 @@ class PlexClient {
               try {
                 results.add(_createTaggedMetadata(json));
               } catch (e) {
-                // Skip items that fail to parse
+                // 跳过解析失败的项目
                 appLogger.w('Failed to parse search result', error: e);
                 appLogger.d('Problematic JSON: $json');
               }
@@ -689,7 +700,7 @@ class PlexClient {
     return results;
   }
 
-  /// Get recently added media (filtered to video content only)
+  /// 获取最近添加的媒体（仅限视频内容）
   Future<List<PlexMetadata>> getRecentlyAdded({int limit = 50}) async {
     final response = await _dio.get(
       '/library/recentlyAdded',
@@ -697,11 +708,11 @@ class PlexClient {
     );
     final allItems = _extractMetadataList(response);
 
-    // Filter out music content (artists, albums, tracks)
+    // 过滤掉音乐内容（艺术家、专辑、音轨）
     return allItems.where((item) => !item.isMusicContent).toList();
   }
 
-  /// Get on deck items (continue watching, filtered to video content only)
+  /// 获取 On Deck 项目（继续观看，仅限视频内容）
   Future<List<PlexMetadata>> getOnDeck() async {
     final response = await _dio.get('/library/onDeck');
     final container = _getMediaContainer(response);
@@ -710,24 +721,24 @@ class PlexClient {
           .map((json) => _tagMetadata(PlexMetadata.fromJsonWithImages(json)))
           .toList();
 
-      // Filter out music content (artists, albums, tracks)
+      // 过滤掉音乐内容
       return allItems.where((item) => !item.isMusicContent).toList();
     }
     return [];
   }
 
-  /// Get on deck items filtered by a specific library section
+  /// 获取特定媒体库的 On Deck 项目
   Future<List<PlexMetadata>> getOnDeckForLibrary(String sectionId) async {
     final allOnDeck = await getOnDeck();
 
-    // Filter items to only include those from the specified library section
+    // 仅保留属于指定媒体库的项目
     return allOnDeck.where((item) {
       return item.librarySectionID == int.tryParse(sectionId);
     }).toList();
   }
 
-  /// Get children of a metadata item (e.g., seasons for a show, episodes for a season)
-  /// Uses cache when offline or as fallback on network error
+  /// 获取元数据的子项（例如剧集的季，季的单集）
+  /// 离线时使用缓存，或作为网络错误的备选
   Future<List<PlexMetadata>> getChildren(String ratingKey) async {
     final endpoint = '/library/metadata/$ratingKey/children';
 
@@ -740,19 +751,19 @@ class PlexClient {
         [];
   }
 
-  /// Get all unwatched episodes for a TV show across all seasons
+  /// 获取某部剧集的所有未观看剧集
   Future<List<PlexMetadata>> getAllUnwatchedEpisodes(String showRatingKey) async {
     final allEpisodes = <PlexMetadata>[];
 
-    // Get all seasons for the show
+    // 获取该剧集的所有季
     final seasons = await getChildren(showRatingKey);
 
-    // Get episodes from each season
+    // 遍历每一季获取剧集
     for (final season in seasons) {
       if (season.isSeason) {
         final episodes = await getChildren(season.ratingKey);
 
-        // Filter for unwatched episodes
+        // 筛选未观看的单集
         final unwatchedEpisodes = episodes.where((ep) => ep.isEpisode && (ep.viewCount ?? 0) == 0).toList();
 
         allEpisodes.addAll(unwatchedEpisodes);
@@ -762,27 +773,26 @@ class PlexClient {
     return allEpisodes;
   }
 
-  /// Get all unwatched episodes in a specific season
+  /// 获取某一季中所有未观看的剧集
   Future<List<PlexMetadata>> getUnwatchedEpisodesInSeason(String seasonRatingKey) async {
     final episodes = await getChildren(seasonRatingKey);
 
-    // Filter for unwatched episodes
+    // 筛选未观看的单集
     return episodes.where((ep) => ep.isEpisode && (ep.viewCount ?? 0) == 0).toList();
   }
 
-  /// Get thumbnail URL
+  /// 获取缩略图 URL
   String getThumbnailUrl(String? thumbPath) {
     if (thumbPath == null || thumbPath.isEmpty) return '';
 
-    // Remove leading slash if present
+    // 如果路径以 / 开头，移除它
     final path = thumbPath.startsWith('/') ? thumbPath.substring(1) : thumbPath;
 
     return '${config.baseUrl}/$path'.withPlexToken(config.token);
   }
 
-  /// Get video URL for direct playback
-  /// [mediaIndex] specifies which Media item to use (defaults to 0 - first version)
-  /// Uses cache for offline mode support and network fallback.
+  /// 获取视频的直接播放 URL
+  /// [mediaIndex] 指定使用哪个媒体版本（默认为 0 - 第一个版本）
   Future<String?> getVideoUrl(String ratingKey, {int mediaIndex = 0}) async {
     final data = await _fetchMetadataWithCache(ratingKey);
     final metadataJson = _getFirstMetadataJsonFromData(data);
@@ -790,7 +800,7 @@ class PlexClient {
     if (metadataJson != null && metadataJson['Media'] != null && (metadataJson['Media'] as List).isNotEmpty) {
       final mediaList = metadataJson['Media'] as List;
 
-      // Ensure the requested index is valid
+      // 确保请求的索引有效
       if (mediaIndex < 0 || mediaIndex >= mediaList.length) {
         mediaIndex = 0;
       }
@@ -801,7 +811,7 @@ class PlexClient {
         final partKey = part['key'] as String?;
 
         if (partKey != null) {
-          // Return direct play URL
+          // 返回直连播放 URL
           return '${config.baseUrl}$partKey'.withPlexToken(config.token);
         }
       }
@@ -810,7 +820,7 @@ class PlexClient {
     return null;
   }
 
-  /// Get chapters for a media item
+  /// 获取媒体项目的章节信息
   Future<List<PlexChapter>> getChapters(String ratingKey) async {
     final response = await _dio.get('/library/metadata/$ratingKey', queryParameters: {'includeChapters': 1});
 
@@ -832,6 +842,7 @@ class PlexClient {
     return [];
   }
 
+  /// 获取媒体项目的标记信息（如片头、片尾标记）
   Future<List<PlexMarker>> getMarkers(String ratingKey) async {
     final response = await _dio.get('/library/metadata/$ratingKey', queryParameters: {'includeMarkers': 1});
 
@@ -852,13 +863,11 @@ class PlexClient {
     return [];
   }
 
-  /// Get chapters and markers from cached metadata or fetch if needed
-  /// Uses same cache key as other metadata methods for consistency
+  /// 从缓存或网络获取播放额外信息（章节和标记）
   Future<PlaybackExtras> getPlaybackExtras(String ratingKey) async {
-    // Use same cache key as other metadata methods
     final cacheKey = '/library/metadata/$ratingKey';
 
-    // If offline mode, return from cache only
+    // 离线模式：仅从缓存返回
     if (_offlineMode) {
       final cached = await _cache.get(serverId, cacheKey);
       if (cached != null) {
@@ -867,55 +876,50 @@ class PlexClient {
       return PlaybackExtras(chapters: [], markers: []);
     }
 
-    // Online: check cache first (already has chapters/markers from other fetches)
-    appLogger.d('getPlaybackExtras: serverId=$serverId, cacheKey=$cacheKey');
+    // 在线模式：先检查缓存（可能之前已经获取过包含章节/标记的元数据）
     final cached = await _cache.get(serverId, cacheKey);
     if (cached != null) {
-      final chapters = PlexCacheParser.extractChapters(cached);
-      appLogger.d('getPlaybackExtras: cache hit, ${chapters?.length ?? 0} chapters');
       return _parsePlaybackExtrasFromCachedResponse(cached);
     }
-    appLogger.d('getPlaybackExtras: cache miss');
 
-    // Not in cache - fetch and cache
+    // 缓存未命中 - 获取并缓存
     try {
       final response = await _dio.get(
         '/library/metadata/$ratingKey',
         queryParameters: {'includeChapters': 1, 'includeMarkers': 1},
       );
 
-      // Cache at base endpoint
+      // 缓存到基础端点
       if (response.data != null) {
         await _cache.put(serverId, cacheKey, response.data);
       }
 
       return _parsePlaybackExtrasFromResponse(response);
     } catch (e) {
-      // Network failed
       appLogger.w('Network request failed for playback extras', error: e);
       return PlaybackExtras(chapters: [], markers: []);
     }
   }
 
-  /// Parse PlaybackExtras from API response
+  /// 从 API 响应中解析 [PlaybackExtras]
   PlaybackExtras _parsePlaybackExtrasFromResponse(Response response) {
     final metadataJson = _getFirstMetadataJson(response);
     return _parsePlaybackExtrasFromMetadataJson(metadataJson);
   }
 
-  /// Parse PlaybackExtras from cached response
+  /// 从缓存响应中解析 [PlaybackExtras]
   PlaybackExtras _parsePlaybackExtrasFromCachedResponse(Map<String, dynamic> cached) {
     final metadataJson = PlexCacheParser.extractFirstMetadata(cached);
     return _parsePlaybackExtrasFromMetadataJson(metadataJson);
   }
 
-  /// Parse PlaybackExtras from metadata JSON
+  /// 从元数据 JSON 中解析 [PlaybackExtras]
   PlaybackExtras _parsePlaybackExtrasFromMetadataJson(Map<String, dynamic>? metadataJson) {
     final chapters = <PlexChapter>[];
     final markers = <PlexMarker>[];
 
     if (metadataJson != null) {
-      // Parse chapters
+      // 解析章节
       if (metadataJson['Chapter'] != null) {
         final chapterList = metadataJson['Chapter'] as List<dynamic>;
         for (var chapter in chapterList) {
@@ -932,7 +936,7 @@ class PlexClient {
         }
       }
 
-      // Parse markers
+      // 解析标记
       if (metadataJson['Marker'] != null) {
         final markerList = metadataJson['Marker'] as List;
         for (var marker in markerList) {
@@ -951,9 +955,8 @@ class PlexClient {
     return PlaybackExtras(chapters: chapters, markers: markers);
   }
 
-  /// Get detailed media info including chapters and tracks
-  /// [mediaIndex] specifies which Media item to use (defaults to 0 - first version)
-  /// Uses cache for offline mode support and network fallback.
+  /// 获取详细的媒体信息，包含章节和轨道
+  /// [mediaIndex] 指定使用哪个媒体版本（默认为 0）
   Future<PlexMediaInfo?> getMediaInfo(String ratingKey, {int mediaIndex = 0}) async {
     final data = await _fetchMetadataWithCache(ratingKey);
     final metadataJson = _getFirstMetadataJsonFromData(data);
@@ -961,7 +964,7 @@ class PlexClient {
     if (metadataJson != null && metadataJson['Media'] != null && (metadataJson['Media'] as List).isNotEmpty) {
       final mediaList = metadataJson['Media'] as List;
 
-      // Ensure the requested index is valid
+      // 确保请求的索引有效
       if (mediaIndex < 0 || mediaIndex >= mediaList.length) {
         mediaIndex = 0;
       }
@@ -972,9 +975,9 @@ class PlexClient {
         final partKey = part['key'] as String?;
 
         if (partKey != null) {
-          // Parse streams using helper
+          // 使用助手解析轨道
           final streams = _parseStreams(part['Stream'] as List<dynamic>?);
-          // Parse chapters using helper
+          // 使用助手解析章节
           final chapters = _parseChapters(metadataJson);
 
           return PlexMediaInfo(
@@ -990,9 +993,7 @@ class PlexClient {
     return null;
   }
 
-  /// Get all available media versions for a media item
-  /// Returns a list of PlexMediaVersion objects representing different quality/format options
-  /// Uses cache for offline mode support and network fallback.
+  /// 获取媒体项目的所有可用版本（例如不同分辨率或格式）
   Future<List<PlexMediaVersion>> getMediaVersions(String ratingKey) async {
     final data = await _fetchMetadataWithCache(ratingKey);
     final metadataJson = _getFirstMetadataJsonFromData(data);
@@ -1005,10 +1006,9 @@ class PlexClient {
     return [];
   }
 
-  /// Get consolidated video playback data (URL, media info, and versions) in a single API call
-  /// This method combines the functionality of getVideoUrl(), getMediaInfo(), and getMediaVersions()
-  /// to reduce redundant API calls during video playback initialization.
-  /// Uses cache for offline mode support and network fallback.
+  /// 在一次 API 调用中获取完整的视频播放数据（URL、媒体信息和版本列表）
+  /// 该方法结合了 getVideoUrl()、getMediaInfo() 和 getMediaVersions() 的功能，
+  /// 以减少视频播放初始化时的冗余 API 调用。
   Future<PlexVideoPlaybackData> getVideoPlaybackData(String ratingKey, {int mediaIndex = 0}) async {
     final data = await _fetchMetadataWithCache(ratingKey);
     final metadataJson = _getFirstMetadataJsonFromData(data);
@@ -1020,10 +1020,10 @@ class PlexClient {
     if (metadataJson != null && metadataJson['Media'] != null && (metadataJson['Media'] as List).isNotEmpty) {
       final mediaList = metadataJson['Media'] as List;
 
-      // Parse available media versions first
+      // 首先解析所有可用的媒体版本
       availableVersions = mediaList.map((media) => PlexMediaVersion.fromJson(media as Map<String, dynamic>)).toList();
 
-      // Ensure the requested index is valid
+      // 确保请求的索引有效
       if (mediaIndex < 0 || mediaIndex >= mediaList.length) {
         mediaIndex = 0;
       }
@@ -1034,15 +1034,15 @@ class PlexClient {
         final partKey = part['key'] as String?;
 
         if (partKey != null) {
-          // Get video URL
+          // 获取视频 URL
           videoUrl = '${config.baseUrl}$partKey'.withPlexToken(config.token);
 
-          // Parse streams using helper
+          // 使用助手解析轨道
           final streams = _parseStreams(part['Stream'] as List<dynamic>?);
-          // Parse chapters using helper
+          // 使用助手解析章节
           final chapters = _parseChapters(metadataJson);
 
-          // Create media info
+          // 创建媒体信息对象
           mediaInfo = PlexMediaInfo(
             videoUrl: videoUrl,
             audioTracks: streams.audio,
@@ -1057,8 +1057,7 @@ class PlexClient {
     return PlexVideoPlaybackData(videoUrl: videoUrl, mediaInfo: mediaInfo, availableVersions: availableVersions);
   }
 
-  /// Get file information for a media item
-  /// Uses cache for offline mode support and network fallback.
+  /// 获取媒体项目的文件详细信息
   Future<PlexFileInfo?> getFileInfo(String ratingKey) async {
     try {
       final data = await _fetchMetadataWithCache(ratingKey);
@@ -1068,7 +1067,7 @@ class PlexClient {
         final media = metadataJson['Media'][0];
         final part = media['Part'] != null && (media['Part'] as List).isNotEmpty ? media['Part'][0] : null;
 
-        // Extract video stream details
+        // 提取视频流详情
         final streams = part?['Stream'] as List<dynamic>? ?? [];
         Map<String, dynamic>? videoStream;
         Map<String, dynamic>? audioStream;
@@ -1083,7 +1082,7 @@ class PlexClient {
         }
 
         return PlexFileInfo(
-          // Media level properties
+          // 媒体层级属性
           container: media['container'] as String?,
           videoCodec: media['videoCodec'] as String?,
           videoResolution: media['videoResolution'] as String?,
@@ -1099,10 +1098,10 @@ class PlexClient {
           audioChannels: media['audioChannels'] as int?,
           optimizedForStreaming: media['optimizedForStreaming'] as bool?,
           has64bitOffsets: media['has64bitOffsets'] as bool?,
-          // Part level properties (file)
+          // 文件层级属性 (Part)
           filePath: part?['file'] as String?,
           fileSize: part?['size'] as int?,
-          // Video stream details
+          // 视频流详情
           colorSpace: videoStream?['colorSpace'] as String?,
           colorRange: videoStream?['colorRange'] as String?,
           colorPrimaries: videoStream?['colorPrimaries'] as String?,
@@ -1110,7 +1109,7 @@ class PlexClient {
           chromaSubsampling: videoStream?['chromaSubsampling'] as String?,
           frameRate: (videoStream?['frameRate'] as num?)?.toDouble(),
           bitDepth: videoStream?['bitDepth'] as int?,
-          // Audio stream details
+          // 音频流详情
           audioChannelLayout: audioStream?['audioChannelLayout'] as String?,
         );
       }
@@ -1122,17 +1121,17 @@ class PlexClient {
     }
   }
 
-  /// Mark media as watched
+  /// 将媒体标记为已观看
   Future<void> markAsWatched(String ratingKey) async {
     await _dio.get('/:/scrobble', queryParameters: {'key': ratingKey, 'identifier': 'com.plexapp.plugins.library'});
   }
 
-  /// Mark media as unwatched
+  /// 将媒体标记为未观看
   Future<void> markAsUnwatched(String ratingKey) async {
     await _dio.get('/:/unscrobble', queryParameters: {'key': ratingKey, 'identifier': 'com.plexapp.plugins.library'});
   }
 
-  /// Update playback progress
+  /// 更新播放进度
   Future<void> updateProgress(
     String ratingKey, {
     required int time,
@@ -1151,19 +1150,18 @@ class PlexClient {
     );
   }
 
-  /// Remove item from Continue Watching (On Deck) without affecting watch status or progress
-  /// This uses the same endpoint Plex Web uses to hide items from Continue Watching
+  /// 从“继续观看”列表中移除项目，而不影响观看状态或进度
   Future<void> removeFromOnDeck(String ratingKey) async {
     await _dio.put('/actions/removeFromContinueWatching', queryParameters: {'ratingKey': ratingKey});
   }
 
-  /// Get server preferences
+  /// 获取服务器偏好设置
   Future<Map<String, dynamic>> getServerPreferences() async {
     final response = await _dio.get('/:/prefs');
     return response.data;
   }
 
-  /// Get sessions (currently playing)
+  /// 获取当前正在播放的会话
   Future<List<dynamic>> getSessions() async {
     final response = await _dio.get('/status/sessions');
     final container = _getMediaContainer(response);
@@ -1173,53 +1171,50 @@ class PlexClient {
     return [];
   }
 
-  /// Get available filters for a library section
+  /// 获取媒体库节可用的筛选器
   Future<List<PlexFilter>> getLibraryFilters(String sectionId) async {
     final response = await _dio.get('/library/sections/$sectionId/filters');
     return _extractDirectoryList(response, PlexFilter.fromJson);
   }
 
-  /// Get filter values (e.g., list of genres, years, etc.)
+  /// 获取筛选器的具体值（例如：流派列表、年份列表等）
   Future<List<PlexFilterValue>> getFilterValues(String filterKey) async {
     final response = await _dio.get(filterKey);
     return _extractDirectoryList(response, PlexFilterValue.fromJson);
   }
 
-  /// Get available sort options for a library section
-  ///
-  /// If [libraryType] is provided (e.g., 'movie', 'show'), it's used for fallback
-  /// sorts without needing to re-fetch the library sections list.
+  /// 获取媒体库节可用的排序选项
   Future<List<PlexSort>> getLibrarySorts(String sectionId, {String? libraryType}) async {
     try {
-      // Use the dedicated sorts endpoint
+      // 使用专门的 sorts 端点
       final response = await _dio.get('/library/sections/$sectionId/sorts');
 
-      // Parse the Directory array (not Sort array) per the API spec
+      // 根据 API 规范解析 Directory 数组
       final sorts = _extractDirectoryList(response, PlexSort.fromJson);
 
       if (sorts.isNotEmpty) {
         return sorts;
       }
 
-      // Fallback: return common sort options if API doesn't provide them
+      // 备选方案：如果 API 未提供，则返回通用的排序选项
       return _getFallbackSorts(libraryType);
     } catch (e) {
       appLogger.e('Failed to get library sorts: $e');
-      // Return fallback sort options on error
+      // 发生错误时返回备选排序选项
       return _getFallbackSorts(libraryType);
     }
   }
 
-  /// Build fallback sort options based on library type.
+  /// 根据媒体库类型构建备选排序选项。
   ///
-  /// If [libraryType] is null, returns generic sorts without the show-specific options.
+  /// 如果 [libraryType] 为 null，则返回不包含剧集特定选项的通用排序。
   List<PlexSort> _getFallbackSorts(String? libraryType) {
     final fallbackSorts = <PlexSort>[
       PlexSort(key: 'titleSort', title: 'Title', defaultDirection: 'asc'),
       PlexSort(key: 'addedAt', descKey: 'addedAt:desc', title: 'Date Added', defaultDirection: 'desc'),
     ];
 
-    // Add "Latest Episode Air Date" only for TV show libraries
+    // 仅为电视剧媒体库添加“最近集播出日期”
     if (libraryType?.toLowerCase() == 'show') {
       fallbackSorts.add(
         PlexSort(
@@ -1244,8 +1239,8 @@ class PlexClient {
     return fallbackSorts;
   }
 
-  /// Get library hubs (recommendations for a specific library section)
-  /// Returns a list of recommendation hubs like "Trending Movies", "Top in Genre", etc.
+  /// 获取媒体库推荐中心（特定媒体库的推荐内容）
+  /// 返回“热门电影”“流派顶部”等推荐中心列表。
   Future<List<PlexHub>> getLibraryHubs(String sectionId, {int limit = 10}) async {
     try {
       final response = await _dio.get(
@@ -1259,9 +1254,9 @@ class PlexClient {
         for (final hubJson in container['Hub'] as List) {
           try {
             final hub = PlexHub.fromJson(hubJson);
-            // Only include hubs that have items and are movie/show content
+            // 仅包含有内容的视频类推荐中心
             if (hub.items.isNotEmpty) {
-              // Filter out non-video content types and tag with server info
+              // 过滤掉非视频内容类型，并标记服务器信息
               final videoItems = hub.items
                   .where((item) {
                     return item.isMovie || item.isShow;
@@ -1297,20 +1292,20 @@ class PlexClient {
     return [];
   }
 
-  /// Get full content from a hub using its hub key
-  /// Returns the complete list of metadata items in the hub
+  /// 通过推荐中心 Key 获取完整内容
+  /// 返回推荐中心中完整的元数据项列表
   Future<List<PlexMetadata>> getHubContent(String hubKey) async {
     return _wrapListApiCall<PlexMetadata>(() => _dio.get(hubKey), (response) {
       final allItems = _extractMetadataList(response);
-      // Filter out non-video content types
+      // 过滤掉非视频内容类型
       return allItems.where((item) {
         return item.isMovie || item.isShow;
       }).toList();
     }, 'Failed to get hub content');
   }
 
-  /// Get playlist content by playlist ID
-  /// Returns the list of metadata items in the playlist
+  /// 通过播放列表 ID 获取播放列表内容
+  /// 返回播放列表中的元数据项列表
   Future<List<PlexMetadata>> getPlaylist(String playlistId) async {
     return _wrapListApiCall<PlexMetadata>(
       () => _dio.get('/playlists/$playlistId/items'),
@@ -1319,9 +1314,9 @@ class PlexClient {
     );
   }
 
-  /// Get all playlists
-  /// Filters by playlistType=video by default
-  /// Set smart to true/false to filter smart playlists, or null for all
+  /// 获取所有播放列表
+  /// 默认按 playlistType=video 过滤
+  /// 设置 smart 为 true/false 以过滤智能播放列表，或设为 null 以获取全部
   Future<List<PlexPlaylist>> getPlaylists({String playlistType = 'video', bool? smart}) async {
     final queryParams = <String, dynamic>{'playlistType': playlistType};
     if (smart != null) {
@@ -1335,8 +1330,8 @@ class PlexClient {
     );
   }
 
-  /// Get playlist metadata by playlist ID
-  /// Returns the playlist details (not the items)
+  /// 通过播放列表 ID 获取播放列表元数据
+  /// 返回播放列表详情（而非列表项）
   Future<PlexPlaylist?> getPlaylistMetadata(String playlistId) async {
     try {
       final response = await _dio.get('/playlists/$playlistId');
@@ -1359,10 +1354,10 @@ class PlexClient {
     }
   }
 
-  /// Create a new playlist
-  /// [title] - Name of the playlist
-  /// [uri] - Optional comma-separated list of item URIs to add (e.g., "server://uuid/com.plexapp.plugins.library/library/metadata/1234")
-  /// [playQueueId] - Optional play queue ID to create playlist from
+  /// 创建新播放列表
+  /// [title] - 播放列表名称
+  /// [uri] - 可选的逗号分隔的项目 URI 列表（例如 "server://uuid/com.plexapp.plugins.library/library/metadata/1234"）
+  /// [playQueueId] - 可选的用于创建播放列表的播放队列 ID
   Future<PlexPlaylist?> createPlaylist({required String title, String? uri, int? playQueueId}) async {
     try {
       final queryParams = <String, dynamic>{'type': 'video', 'title': title, 'smart': '0'};
@@ -1394,14 +1389,14 @@ class PlexClient {
     }
   }
 
-  /// Delete a playlist
+  /// 删除播放列表
   Future<bool> deletePlaylist(String playlistId) async {
     return _wrapBoolApiCall(() => _dio.delete('/playlists/$playlistId'), 'Failed to delete playlist');
   }
 
-  /// Add items to a playlist
-  /// [playlistId] - The playlist to add items to
-  /// [uri] - Comma-separated list of item URIs to add
+  /// 向播放列表添加项目
+  /// [playlistId] - 目标播放列表 ID
+  /// [uri] - 要添加项目的逗号分隔 URI 列表
   Future<bool> addToPlaylist({required String playlistId, required String uri}) async {
     appLogger.d(
       'Adding to playlist $playlistId with URI: ${uri.substring(0, uri.length > 100 ? 100 : uri.length)}${uri.length > 100 ? "..." : ""}',
@@ -1416,9 +1411,9 @@ class PlexClient {
     return result;
   }
 
-  /// Remove an item from a playlist
-  /// [playlistId] - The playlist to remove from
-  /// [playlistItemId] - The playlist item ID to remove (from the item's playlistItemID field)
+  /// 从播放列表移除项目
+  /// [playlistId] - 目标播放列表 ID
+  /// [playlistItemId] - 要移除的播放列表项 ID（来自项目的 playlistItemID 字段）
   Future<bool> removeFromPlaylist({required String playlistId, required String playlistItemId}) async {
     return _wrapBoolApiCall(
       () => _dio.delete('/playlists/$playlistId/items/$playlistItemId'),
@@ -1426,11 +1421,11 @@ class PlexClient {
     );
   }
 
-  /// Move a playlist item to a new position
-  /// Only works with non-smart playlists
-  /// [playlistId] - The playlist rating key
-  /// [playlistItemId] - The playlist item ID to move
-  /// [afterPlaylistItemId] - Move the item after this playlist item ID (0 = move to top)
+  /// 移动播放列表项到新位置
+  /// 仅适用于非智能播放列表
+  /// [playlistId] - 播放列表评分键
+  /// [playlistItemId] - 要移动的播放列表项 ID
+  /// [afterPlaylistItemId] - 将项目移动到此播放列表项 ID 之后（0 = 移至顶部）
   Future<bool> movePlaylistItem({
     required String playlistId,
     required int playlistItemId,
@@ -1450,13 +1445,13 @@ class PlexClient {
     return result;
   }
 
-  /// Clear all items from a playlist
+  /// 清空播放列表中的所有项目
   Future<bool> clearPlaylist(String playlistId) async {
     return _wrapBoolApiCall(() => _dio.delete('/playlists/$playlistId/items'), 'Failed to clear playlist');
   }
 
-  /// Update playlist metadata (e.g., title, summary)
-  /// Uses the same metadata editing mechanism as other items
+  /// 更新播放列表元数据（例如标题、摘要）
+  /// 使用与其他项目相同的元数据编辑机制
   Future<bool> updatePlaylist({required String playlistId, String? title, String? summary}) async {
     final queryParams = <String, dynamic>{'type': 'playlist', 'id': playlistId};
 
@@ -1476,17 +1471,17 @@ class PlexClient {
   }
 
   // ============================================================================
-  // Collection Methods
+  // 收藏集方法 (Collection Methods)
   // ============================================================================
 
-  /// Get all collections for a library section
-  /// Returns collections as PlexMetadata objects with type="collection"
+  /// 获取媒体库节的所有收藏集
+  /// 返回收藏集作为 PlexMetadata 对象，type="collection"
   Future<List<PlexMetadata>> getLibraryCollections(String sectionId) async {
     return _wrapListApiCall<PlexMetadata>(
       () => _dio.get('/library/sections/$sectionId/collections', queryParameters: {'includeGuids': 1}),
       (response) {
         final allItems = _extractMetadataList(response);
-        // Collections should have type="collection"
+        // 收藏集的 type 应该为 "collection"
         return allItems.where((item) {
           return item.isCollection;
         }).toList();
@@ -1495,8 +1490,8 @@ class PlexClient {
     );
   }
 
-  /// Get items in a collection
-  /// Returns the list of metadata items in the collection
+  /// 获取收藏集中的项目
+  /// 返回收藏集中的元数据项列表
   Future<List<PlexMetadata>> getCollectionItems(String collectionId) async {
     return _wrapListApiCall<PlexMetadata>(
       () => _dio.get('/library/collections/$collectionId/children'),
@@ -1505,8 +1500,8 @@ class PlexClient {
     );
   }
 
-  /// Delete a collection
-  /// Deletes a library collection from the server
+  /// 删除收藏集
+  /// 从服务器删除媒体库收藏集
   Future<bool> deleteCollection(String sectionId, String collectionId) async {
     appLogger.d('Deleting collection: sectionId=$sectionId, collectionId=$collectionId');
     final result = await _wrapBoolApiCall(
@@ -1519,9 +1514,9 @@ class PlexClient {
     return result;
   }
 
-  /// Create a new collection
-  /// Creates a new collection and optionally adds items to it
-  /// Returns the created collection ID or null if failed
+  /// 创建新收藏集
+  /// 创建新收藏集并可选地向其添加项目
+  /// 返回创建的收藏集 ID，如果失败则返回 null
   Future<String?> createCollection({
     required String sectionId,
     required String title,
@@ -1542,8 +1537,8 @@ class PlexClient {
       );
       appLogger.d('Create collection response: ${response.statusCode}');
 
-      // Extract the collection ID from the response
-      // The response should contain the created collection metadata
+      // 从响应中提取收藏集 ID
+      // 响应应包含创建的收藏集元数据
       final container = _getMediaContainer(response);
       if (container != null) {
         final metadata = container['Metadata'];
@@ -1561,8 +1556,8 @@ class PlexClient {
     }
   }
 
-  /// Add items to an existing collection
-  /// Adds one or more items (specified by URI) to an existing collection
+  /// 向现有收藏集添加项目
+  /// 向现有收藏集添加一个或多个项目（通过 URI 指定）
   Future<bool> addToCollection({required String collectionId, required String uri}) async {
     appLogger.d('Adding items to collection: collectionId=$collectionId');
     final result = await _wrapBoolApiCall(
@@ -1575,8 +1570,8 @@ class PlexClient {
     return result;
   }
 
-  /// Remove an item from a collection
-  /// Removes a single item from an existing collection
+  /// 从收藏集中移除项目
+  /// 从现有收藏集中移除单个项目
   Future<bool> removeFromCollection({required String collectionId, required String itemId}) async {
     appLogger.d('Removing item from collection: collectionId=$collectionId, itemId=$itemId');
     final result = await _wrapBoolApiCall(
@@ -1590,11 +1585,11 @@ class PlexClient {
   }
 
   // ============================================================================
-  // Play Queue Methods
+  // 播放队列方法 (Play Queue Methods)
   // ============================================================================
 
-  /// Create a new play queue
-  /// Either uri or playlistID must be specified
+  /// 创建新播放队列
+  /// 必须指定 uri 或 playlistID 之一
   Future<PlayQueueResponse?> createPlayQueue({
     String? uri,
     int? playlistID,
@@ -1631,8 +1626,8 @@ class PlexClient {
     }
   }
 
-  /// Get a play queue with optional windowing
-  /// Can request a window of items around a specific item
+  /// 获取播放队列，支持可选的分页/窗口请求
+  /// 可以请求特定项目周围的一窗口项目
   Future<PlayQueueResponse?> getPlayQueue(
     int playQueueId, {
     String? center,
@@ -1660,8 +1655,8 @@ class PlexClient {
     }
   }
 
-  /// Shuffle a play queue
-  /// The currently selected item is maintained
+  /// 打乱播放队列
+  /// 保持当前选定的项目不变
   Future<PlayQueueResponse?> shufflePlayQueue(int playQueueId) async {
     try {
       final response = await _dio.put('/playQueues/$playQueueId/shuffle');
@@ -1672,38 +1667,38 @@ class PlexClient {
     }
   }
 
-  /// Clear all items from a play queue
+  /// 清空播放队列中的所有项目
   Future<bool> clearPlayQueue(int playQueueId) async {
     return _wrapBoolApiCall(() => _dio.delete('/playQueues/$playQueueId/items'), 'Failed to clear play queue');
   }
 
-  /// Create a play queue for a TV show (all episodes)
+  /// 为电视剧创建播放队列（所有剧集）
   ///
-  /// This is a convenience method that creates a play queue from a show's URI.
-  /// Perfect for sequential or shuffle playback of an entire series.
+  /// 这是一个便捷方法，通过剧集的 URI 创建播放队列。
+  /// 非常适合按顺序或随机播放整个系列。
   ///
-  /// Parameters:
-  /// - [showRatingKey]: The rating key of the show
-  /// - [shuffle]: Whether to shuffle the episodes (0 = off, 1 = on)
-  /// - [startingEpisodeKey]: Optional rating key of episode to start from
+  /// 参数：
+  /// - [showRatingKey]: 剧集的 ratingKey
+  /// - [shuffle]: 是否打乱剧集（0 = 关闭，1 = 开启）
+  /// - [startingEpisodeKey]: 可选的起始剧集 ratingKey
   ///
-  /// Returns a PlayQueueResponse with all episodes from the show
+  /// 返回包含该剧集所有分集的 PlayQueueResponse
   Future<PlayQueueResponse?> createShowPlayQueue({
     required String showRatingKey,
     int shuffle = 0,
     String? startingEpisodeKey,
   }) async {
     try {
-      // Get machine identifier for building the URI
+      // 获取机器标识符以构建 URI
       final machineId = config.machineIdentifier ?? await getMachineIdentifier();
       if (machineId == null) {
         throw Exception('Could not get server machine identifier');
       }
 
-      // Build the URI for the show's episodes
+      // 构建剧集分集的 URI
       final uri = 'server://$machineId/com.plexapp.plugins.library/library/metadata/$showRatingKey/children';
 
-      // Create the play queue with optional starting episode
+      // 创建播放队列，并可选指定起始剧集
       return await createPlayQueue(
         uri: uri,
         type: 'video',
@@ -1716,22 +1711,22 @@ class PlexClient {
     }
   }
 
-  /// Extract both Metadata and Directory entries from response
-  /// Folders can come back as either type
-  /// Automatically tags all items with this client's serverId and serverName
+  /// 从响应中提取元数据 (Metadata) 和目录 (Directory) 项
+  /// 文件夹可以作为其中任一类型返回
+  /// 自动为所有项目标记此客户端的 serverId 和 serverName
   List<PlexMetadata> _extractMetadataAndDirectories(Response response) {
     final List<PlexMetadata> items = [];
     final container = _getMediaContainer(response);
 
     if (container != null) {
-      // Extract Metadata entries - try full parsing first
+      // 提取 Metadata 项 - 首先尝试完整解析
       if (container['Metadata'] != null) {
         for (final json in container['Metadata'] as List) {
           try {
-            // Try to parse with full PlexMetadata.fromJson first
+            // 首先尝试使用完整的 PlexMetadata.fromJson 解析
             items.add(_createTaggedMetadata(json));
           } catch (e) {
-            // If full parsing fails, use minimal safe parsing
+            // 如果完整解析失败，使用最小化安全解析
             appLogger.d('Using minimal parsing for metadata item: $e');
             try {
               items.add(
@@ -1754,14 +1749,14 @@ class PlexClient {
         }
       }
 
-      // Extract Directory entries (folders)
+      // 提取 Directory 项（文件夹）
       if (container['Directory'] != null) {
         for (final json in container['Directory'] as List) {
           try {
-            // Try to parse as PlexMetadata first
+            // 首先尝试作为 PlexMetadata 解析
             items.add(_createTaggedMetadata(json));
           } catch (e) {
-            // If that fails, use minimal folder representation
+            // 如果失败，使用最小化的文件夹表示
             try {
               items.add(
                 PlexMetadata(
@@ -1786,8 +1781,8 @@ class PlexClient {
     return items;
   }
 
-  /// Get root folders for a library section
-  /// Returns the top-level folder structure for filesystem-based browsing
+  /// 获取媒体库节的根文件夹
+  /// 返回用于文件系统浏览的顶层文件夹结构
   Future<List<PlexMetadata>> getLibraryFolders(String sectionId) async {
     try {
       final response = await _dio.get(
@@ -1801,8 +1796,8 @@ class PlexClient {
     }
   }
 
-  /// Get children of a specific folder
-  /// Returns files and subfolders within the given folder
+  /// 获取特定文件夹的子项
+  /// 返回给定文件夹内的文件和子文件夹
   Future<List<PlexMetadata>> getFolderChildren(String folderKey) async {
     try {
       final response = await _dio.get(folderKey);
@@ -1813,45 +1808,45 @@ class PlexClient {
     }
   }
 
-  /// Get library-specific playlists
-  /// Filters playlists by checking if they contain items from the specified library
-  /// This is a client-side filter since the API doesn't support sectionId for playlists
+  /// 获取媒体库特定的播放列表
+  /// 通过检查播放列表是否包含指定媒体库的项目来过滤播放列表
+  /// 这是一个客户端过滤器，因为 API 不支持按 sectionId 过滤播放列表
   Future<List<PlexPlaylist>> getLibraryPlaylists({required String sectionId, String playlistType = 'video'}) async {
-    // For now, return all video playlists
-    // Future enhancement: filter by checking playlist items' library
+    // 目前返回所有视频播放列表
+    // 未来增强：通过检查播放列表项的媒体库进行过滤
     return getPlaylists(playlistType: playlistType);
   }
 
   // ============================================================================
-  // Library Management Methods
+  // 媒体库管理方法 (Library Management Methods)
   // ============================================================================
 
-  /// Scan/refresh a library section to detect new files
+  /// 扫描/刷新媒体库节以检测新文件
   Future<void> scanLibrary(String sectionId) async {
     await _dio.get('/library/sections/$sectionId/refresh');
   }
 
-  /// Refresh metadata for a library section
+  /// 刷新媒体库节的元数据
   Future<void> refreshLibraryMetadata(String sectionId) async {
     await _dio.get('/library/sections/$sectionId/refresh?force=1');
   }
 
-  /// Empty trash for a library section
+  /// 清空媒体库节的回收站
   Future<void> emptyLibraryTrash(String sectionId) async {
     await _dio.put('/library/sections/$sectionId/emptyTrash');
   }
 
-  /// Analyze library section
+  /// 分析媒体库节
   Future<void> analyzeLibrary(String sectionId) async {
     await _dio.get('/library/sections/$sectionId/analyze');
   }
 
   // ============================================================================
-  // Library Statistics Methods
+  // 媒体库统计方法 (Library Statistics Methods)
   // ============================================================================
 
-  /// Get total item count for a library section efficiently.
-  /// Uses X-Plex-Container-Size: 1 to get totalSize with minimal data transfer.
+  /// 高效获取媒体库节的项目总数。
+  /// 使用 X-Plex-Container-Size: 1 以最小的数据传输量获取 totalSize。
   Future<int> getLibraryTotalCount(String sectionId) async {
     try {
       final response = await _dio.get(
@@ -1859,7 +1854,7 @@ class PlexClient {
         queryParameters: {'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 1},
       );
       final container = _getMediaContainer(response);
-      // Try totalSize first, fall back to size if not available
+      // 首先尝试获取 totalSize，如果不可用则退而求其次使用 size
       return container?['totalSize'] as int? ?? container?['size'] as int? ?? 0;
     } catch (e) {
       appLogger.e('Failed to get library total count: $e');
@@ -1867,8 +1862,8 @@ class PlexClient {
     }
   }
 
-  /// Get total episode count for a TV show library.
-  /// Uses the allLeaves endpoint to count all episodes.
+  /// 获取电视剧媒体库的总分集数。
+  /// 使用 allLeaves 端点统计所有剧集。
   Future<int> getLibraryEpisodeCount(String sectionId) async {
     try {
       final response = await _dio.get(
@@ -1883,9 +1878,9 @@ class PlexClient {
     }
   }
 
-  /// Get watch history count for a time period.
-  /// [since] - Optional DateTime to filter history from this date onwards.
-  /// Returns the total count of items watched.
+  /// 获取指定时间段内的观看历史数量。
+  /// [since] - 可选的 DateTime，用于过滤此日期之后的历史记录。
+  /// 返回已观看项目的总数。
   Future<int> getWatchHistoryCount({DateTime? since}) async {
     try {
       final queryParams = <String, dynamic>{'X-Plex-Container-Start': 0, 'X-Plex-Container-Size': 1};
@@ -1902,6 +1897,7 @@ class PlexClient {
     }
   }
 
+  /// 处理端点切换
   Future<void> _handleEndpointSwitch(String newBaseUrl) async {
     if (config.baseUrl == newBaseUrl) {
       return;

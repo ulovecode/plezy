@@ -1,15 +1,15 @@
 import 'package:json_annotation/json_annotation.dart';
 
-/// Mixin that provides multi-server support fields for models.
+/// 为模型提供多服务器支持字段的混入（Mixin）。
 ///
-/// This mixin adds serverId and serverName fields that are excluded from
-/// JSON serialization but can be used to track which server an item belongs to.
+/// 此混入添加了 serverId 和 serverName 字段，这些字段不包含在 JSON 序列化中，
+/// 但可用于跟踪项目属于哪个服务器。
 mixin MultiServerFields {
-  /// Server machine identifier (not from API)
+  /// 服务器机器标识符（非来自 API）
   @JsonKey(includeFromJson: false, includeToJson: false)
   String? get serverId;
 
-  /// Server display name (not from API)
+  /// 服务器显示名称（非来自 API）
   @JsonKey(includeFromJson: false, includeToJson: false)
   String? get serverName;
 }

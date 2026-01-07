@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../services/multi_server_manager.dart';
 
-/// Tracks offline mode status based on network connectivity and server reachability.
+/// 根据网络连接和服务器可达性跟踪离线模式状态。
 class OfflineModeProvider extends ChangeNotifier {
   final MultiServerManager _serverManager;
 
@@ -16,32 +16,32 @@ class OfflineModeProvider extends ChangeNotifier {
 
   OfflineModeProvider(this._serverManager) : _hasServerConnection = _serverManager.onlineServerIds.isNotEmpty;
 
-  /// Whether the app is currently in offline mode
-  /// Offline = no network OR no servers reachable
+  /// 应用当前是否处于离线模式
+  /// 离线 = 无网络 或 无可达服务器
   bool get isOffline => !_hasNetworkConnection || !_hasServerConnection;
 
-  /// Whether there is network connectivity (WiFi, mobile data, etc.)
+  /// 是否有网络连接 (WiFi、移动数据等)
   bool get hasNetworkConnection => _hasNetworkConnection;
 
-  /// Whether at least one Plex server is reachable
+  /// 是否至少有一个 Plex 服务器可达
   bool get hasServerConnection => _hasServerConnection;
 
-  /// Updates network and server connection flags
+  /// 更新网络和服务器连接标志
   Future<void> _updateConnectionFlags() async {
     final connectivityResult = await Connectivity().checkConnectivity();
     _hasNetworkConnection = !connectivityResult.contains(ConnectivityResult.none);
     _hasServerConnection = _serverManager.onlineServerIds.isNotEmpty;
   }
 
-  /// Initialize the provider and start monitoring
+  /// 初始化 Provider 并开始监控
   Future<void> initialize() async {
     if (_isInitialized) return;
     _isInitialized = true;
 
-    // Check initial connectivity
+    // 检查初始连接状态
     await _updateConnectionFlags();
 
-    // Monitor connectivity changes
+    // 监控网络连接变化
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
       final wasOffline = isOffline;
       _hasNetworkConnection = !results.contains(ConnectivityResult.none);
@@ -51,7 +51,7 @@ class OfflineModeProvider extends ChangeNotifier {
       }
     });
 
-    // Monitor server status from MultiServerManager
+    // 监控来自 MultiServerManager 的服务器状态
     _serverStatusSubscription = _serverManager.statusStream.listen((statusMap) {
       final wasOffline = isOffline;
       _hasServerConnection = statusMap.values.any((isOnline) => isOnline);
@@ -64,7 +64,7 @@ class OfflineModeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Force a refresh of connectivity status
+  /// 强制刷新连接状态
   Future<void> refresh() async {
     await _updateConnectionFlags();
     notifyListeners();

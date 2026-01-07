@@ -3,8 +3,8 @@ import 'package:in_app_review/in_app_review.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/app_logger.dart';
 
-/// Service to manage in-app review prompts
-/// Only enabled when ENABLE_IN_APP_REVIEW build flag is set
+/// 管理应用内评分提示的服务
+/// 仅在设置了 ENABLE_IN_APP_REVIEW 构建标志时启用
 class InAppReviewService {
   static final InAppReviewService _instance = InAppReviewService._();
   static InAppReviewService get instance => _instance;
@@ -13,20 +13,20 @@ class InAppReviewService {
 
   final InAppReview _inAppReview = InAppReview.instance;
 
-  // SharedPreferences keys
+  // SharedPreferences 键
   static const String _keyQualifyingSessionsCount = 'review_qualifying_sessions_count';
   static const String _keyLastPromptTime = 'review_last_prompt_time';
 
-  // Configuration
+  // 配置
   static const int _requiredSessions = 6;
   static const Duration _minimumSessionDuration = Duration(minutes: 5);
   static const Duration _promptCooldown = Duration(days: 60);
 
-  // Session tracking
+  // 会话跟踪
   DateTime? _sessionStartTime;
 
-  /// Check if in-app review is enabled via build flag
-  /// Only enabled on mobile platforms (iOS and Android)
+  /// 检查是否通过构建标志启用了应用内评分
+  /// 仅在移动平台 (iOS 和 Android) 上启用
   static bool get isEnabled {
     if (!Platform.isIOS && !Platform.isAndroid) {
       return false;
@@ -35,15 +35,15 @@ class InAppReviewService {
     return enabled;
   }
 
-  /// Start tracking a new session
+  /// 开始跟踪新会话
   void startSession() {
     if (!isEnabled) return;
     _sessionStartTime = DateTime.now();
-    appLogger.d('In-app review: Session started');
+    appLogger.d('应用内评分：会话已开始');
   }
 
-  /// End the current session and check if it qualifies
-  /// Call this when app goes to background or is closed
+  /// 结束当前会话并检查其是否符合条件
+  /// 当应用进入后台或关闭时调用此方法
   Future<void> endSession() async {
     if (!isEnabled || _sessionStartTime == null) return;
 
@@ -52,45 +52,45 @@ class InAppReviewService {
 
     if (sessionDuration >= _minimumSessionDuration) {
       await _incrementQualifyingSessions();
-      appLogger.d('In-app review: Qualifying session ended (${sessionDuration.inMinutes} minutes)');
+      appLogger.d('应用内评分：符合条件的会话已结束 (${sessionDuration.inMinutes} 分钟)');
       await maybeRequestReview();
     } else {
-      appLogger.d('In-app review: Session too short (${sessionDuration.inMinutes} minutes)');
+      appLogger.d('应用内评分：会话过短 (${sessionDuration.inMinutes} 分钟)');
     }
   }
 
-  /// Increment the qualifying sessions counter
+  /// 增加符合条件的会话计数器
   Future<void> _incrementQualifyingSessions() async {
     final prefs = await SharedPreferences.getInstance();
     final currentCount = prefs.getInt(_keyQualifyingSessionsCount) ?? 0;
     await prefs.setInt(_keyQualifyingSessionsCount, currentCount + 1);
   }
 
-  /// Get the current qualifying sessions count
+  /// 获取当前符合条件的会话计数
   Future<int> _getQualifyingSessionsCount() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt(_keyQualifyingSessionsCount) ?? 0;
   }
 
-  /// Check if we should request a review based on session count and cooldown
+  /// 根据会话计数和冷却时间检查是否应该请求评分
   Future<bool> _shouldRequestReview() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // Check session count
+    // 检查会话计数
     final sessionCount = await _getQualifyingSessionsCount();
     if (sessionCount < _requiredSessions) {
-      appLogger.d('In-app review: Not enough sessions ($sessionCount/$_requiredSessions)');
+      appLogger.d('应用内评分：会话不足 ($sessionCount/$_requiredSessions)');
       return false;
     }
 
-    // Check cooldown
+    // 检查冷却时间
     final lastPromptString = prefs.getString(_keyLastPromptTime);
     if (lastPromptString != null) {
       final lastPrompt = DateTime.parse(lastPromptString);
       final timeSinceLastPrompt = DateTime.now().difference(lastPrompt);
       if (timeSinceLastPrompt < _promptCooldown) {
         final daysRemaining = (_promptCooldown - timeSinceLastPrompt).inDays;
-        appLogger.d('In-app review: Cooldown active ($daysRemaining days remaining)');
+        appLogger.d('应用内评分：冷却中 (剩余 $daysRemaining 天)');
         return false;
       }
     }
@@ -98,7 +98,7 @@ class InAppReviewService {
     return true;
   }
 
-  /// Request a review if conditions are met
+  /// 如果满足条件，则请求评分
   Future<void> maybeRequestReview() async {
     if (!isEnabled) return;
 
@@ -106,33 +106,33 @@ class InAppReviewService {
     if (!shouldRequest) return;
 
     try {
-      // Check if in-app review is available on this device
+      // 检查此设备上是否可以使用应用内评分
       final isAvailable = await _inAppReview.isAvailable();
       if (!isAvailable) {
-        appLogger.d('In-app review: Not available on this device');
+        appLogger.d('应用内评分：此设备上不可用');
         return;
       }
 
-      // Request the review
+      // 请求评分
       await _inAppReview.requestReview();
-      appLogger.i('In-app review: Review prompt shown');
+      appLogger.i('应用内评分：评分提示已显示');
 
-      // Record that we showed the prompt and reset session count
+      // 记录我们已显示提示并重置会话计数
       await _recordPromptShown();
     } catch (e) {
-      appLogger.e('In-app review: Error requesting review', error: e);
+      appLogger.e('应用内评分：请求评分时出错', error: e);
     }
   }
 
-  /// Record that the review prompt was shown
+  /// 记录评分提示已显示
   Future<void> _recordPromptShown() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyLastPromptTime, DateTime.now().toIso8601String());
-    // Reset session count so user needs to use app more before next prompt
+    // 重置会话计数，以便用户在下次提示前需要更多地使用应用
     await prefs.setInt(_keyQualifyingSessionsCount, 0);
   }
 
-  /// Get debug info about the current state (for development/testing)
+  /// 获取有关当前状态的调试信息 (用于开发/测试)
   Future<Map<String, dynamic>> getDebugInfo() async {
     final prefs = await SharedPreferences.getInstance();
     final sessionCount = prefs.getInt(_keyQualifyingSessionsCount) ?? 0;
@@ -150,12 +150,12 @@ class InAppReviewService {
     };
   }
 
-  /// Reset all stored data (for testing purposes)
+  /// 重置所有存储的数据 (用于测试目的)
   Future<void> reset() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyQualifyingSessionsCount);
     await prefs.remove(_keyLastPromptTime);
     _sessionStartTime = null;
-    appLogger.d('In-app review: State reset');
+    appLogger.d('应用内评分：状态已重置');
   }
 }

@@ -17,9 +17,9 @@ import '../utils/app_logger.dart';
 import '../utils/codec_utils.dart';
 import '../utils/plex_cache_parser.dart';
 
-/// Extension methods on AppDatabase for download operations
+/// AppDatabase 的下载操作扩展方法
 extension DownloadDatabaseOperations on AppDatabase {
-  /// Insert a new download into the database
+  /// 向数据库插入一条新的下载记录
   Future<void> insertDownload({
     required String serverId,
     required String ratingKey,
@@ -43,7 +43,7 @@ extension DownloadDatabaseOperations on AppDatabase {
     );
   }
 
-  /// Add item to download queue
+  /// 将项目添加到下载队列
   Future<void> addToQueue({
     required String mediaGlobalKey,
     int priority = 0,
@@ -62,10 +62,10 @@ extension DownloadDatabaseOperations on AppDatabase {
     );
   }
 
-  /// Get next item from queue (highest priority, oldest first)
-  /// Only returns items that are not paused
+  /// 从队列中获取下一个项目 (优先级最高，最早添加的优先)
+  /// 仅返回未暂停的项目
   Future<DownloadQueueItem?> getNextQueueItem() async {
-    // Join with downloadedMedia to check status and filter out paused items
+    // 与 downloadedMedia 关联查询，以检查状态并过滤掉已暂停的项目
     final query = select(
       downloadQueue,
     ).join([innerJoin(downloadedMedia, downloadedMedia.globalKey.equalsExp(downloadQueue.mediaGlobalKey))]);
@@ -82,14 +82,14 @@ extension DownloadDatabaseOperations on AppDatabase {
     return result?.readTable(downloadQueue);
   }
 
-  /// Update download status
+  /// 更新下载状态
   Future<void> updateDownloadStatus(String globalKey, int status) async {
     await (update(
       downloadedMedia,
     )..where((t) => t.globalKey.equals(globalKey))).write(DownloadedMediaCompanion(status: Value(status)));
   }
 
-  /// Update download progress
+  /// 更新下载进度
   Future<void> updateDownloadProgress(String globalKey, int progress, int downloadedBytes, int totalBytes) async {
     await (update(downloadedMedia)..where((t) => t.globalKey.equals(globalKey))).write(
       DownloadedMediaCompanion(
@@ -100,7 +100,7 @@ extension DownloadDatabaseOperations on AppDatabase {
     );
   }
 
-  /// Update video file path
+  /// 更新视频文件路径
   Future<void> updateVideoFilePath(String globalKey, String filePath) async {
     await (update(downloadedMedia)..where((t) => t.globalKey.equals(globalKey))).write(
       DownloadedMediaCompanion(
@@ -110,16 +110,16 @@ extension DownloadDatabaseOperations on AppDatabase {
     );
   }
 
-  /// Update artwork paths
+  /// 更新封面图路径
   Future<void> updateArtworkPaths({required String globalKey, String? thumbPath}) async {
     await (update(
       downloadedMedia,
     )..where((t) => t.globalKey.equals(globalKey))).write(DownloadedMediaCompanion(thumbPath: Value(thumbPath)));
   }
 
-  /// Update download error and increment retry count
+  /// 更新下载错误并增加重试计数
   Future<void> updateDownloadError(String globalKey, String errorMessage) async {
-    // Get current retry count to increment it
+    // 获取当前重试计数并递增
     final existing = await getDownloadedMedia(globalKey);
     final currentCount = existing?.retryCount ?? 0;
 
@@ -128,35 +128,35 @@ extension DownloadDatabaseOperations on AppDatabase {
     );
   }
 
-  /// Clear download error and reset retry count (for retry)
+  /// 清除下载错误并重置重试计数 (用于重试)
   Future<void> clearDownloadError(String globalKey) async {
     await (update(downloadedMedia)..where((t) => t.globalKey.equals(globalKey))).write(
       const DownloadedMediaCompanion(errorMessage: Value(null), retryCount: Value(0)),
     );
   }
 
-  /// Remove item from queue
+  /// 从队列中移除项目
   Future<void> removeFromQueue(String mediaGlobalKey) async {
     await (delete(downloadQueue)..where((t) => t.mediaGlobalKey.equals(mediaGlobalKey))).go();
   }
 
-  /// Get downloaded media item
+  /// 获取已下载的媒体项目
   Future<DownloadedMediaItem?> getDownloadedMedia(String globalKey) async {
     return (select(downloadedMedia)..where((t) => t.globalKey.equals(globalKey))).getSingleOrNull();
   }
 
-  /// Delete a download
+  /// 删除一条下载记录
   Future<void> deleteDownload(String globalKey) async {
     await (delete(downloadedMedia)..where((t) => t.globalKey.equals(globalKey))).go();
     await (delete(downloadQueue)..where((t) => t.mediaGlobalKey.equals(globalKey))).go();
   }
 
-  /// Get all downloaded episodes for a season
+  /// 获取某个季的所有已下载剧集
   Future<List<DownloadedMediaItem>> getEpisodesBySeason(String seasonKey) {
     return (select(downloadedMedia)..where((t) => t.parentRatingKey.equals(seasonKey))).get();
   }
 
-  /// Get all downloaded episodes for a show
+  /// 获取某个剧集的所有已下载剧集
   Future<List<DownloadedMediaItem>> getEpisodesByShow(String showKey) {
     return (select(downloadedMedia)..where((t) => t.grandparentRatingKey.equals(showKey))).get();
   }
@@ -168,39 +168,39 @@ class DownloadManagerService {
   final PlexApiCache _apiCache = PlexApiCache.instance;
   final Dio _dio;
 
-  // Stream controller for download progress updates
+  // 下载进度更新的流控制器
   final _progressController = StreamController<DownloadProgress>.broadcast();
   Stream<DownloadProgress> get progressStream => _progressController.stream;
 
-  // Stream controller for deletion progress updates
+  // 删除进度更新的流控制器
   final _deletionProgressController = StreamController<DeletionProgress>.broadcast();
   Stream<DeletionProgress> get deletionProgressStream => _deletionProgressController.stream;
 
-  // Active downloads with cancel tokens
+  // 带有取消令牌的活跃下载任务
   final Map<String, CancelToken> _activeDownloads = {};
 
-  // Flag to prevent multiple queue processing
+  // 防止重复处理队列的标志
   bool _isProcessingQueue = false;
 
-  // Connectivity listener for auto-resume
+  // 用于自动恢复的连接状态监听器
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
-  // Cached client for auto-resume
+  // 用于自动恢复的缓存客户端
   PlexClient? _lastClient;
 
-  /// Check if downloads should be blocked due to cellular-only setting
+  /// 检查是否由于“仅 WiFi 下载”设置而应阻塞下载
   Future<bool> _shouldBlockDownload() async {
     return shouldBlockDownloadOnCellular();
   }
 
-  /// Public method to check if downloads should be blocked due to cellular-only setting
-  /// Can be used by DownloadProvider to show user-friendly error
+  /// 检查是否由于“仅 WiFi 下载”设置而应阻塞下载的静态方法
+  /// 可被 DownloadProvider 用于显示用户友好的错误信息
   static Future<bool> shouldBlockDownloadOnCellular() async {
     final settings = await SettingsService.getInstance();
     if (!settings.getDownloadOnWifiOnly()) return false;
 
     final connectivity = await Connectivity().checkConnectivity();
-    // Block if on cellular and NOT on WiFi (allow if both are available)
+    // 如果处于移动网络且未连接 WiFi，则阻塞 (如果两者都可用则允许)
     return connectivity.contains(ConnectivityResult.mobile) &&
         !connectivity.contains(ConnectivityResult.wifi) &&
         !connectivity.contains(ConnectivityResult.ethernet);
@@ -211,18 +211,18 @@ class DownloadManagerService {
       _storageService = storageService,
       _dio = dio ?? Dio();
 
-  /// Delete a file if it exists and log the deletion
-  /// Returns true if file was deleted, false otherwise
+  /// 如果文件存在则删除并记录日志
+  /// 如果文件被删除则返回 true，否则返回 false
   Future<bool> _deleteFileIfExists(File file, String description) async {
     if (await file.exists()) {
       await file.delete();
-      appLogger.i('Deleted $description: ${file.path}');
+      appLogger.i('已删除 $description: ${file.path}');
       return true;
     }
     return false;
   }
 
-  /// Queue a download for a media item
+  /// 将媒体项目加入下载队列
   Future<void> queueDownload({
     required PlexMetadata metadata,
     required PlexClient client,
@@ -232,15 +232,15 @@ class DownloadManagerService {
   }) async {
     final globalKey = '${metadata.serverId}:${metadata.ratingKey}';
 
-    // Check if already downloading or completed
+    // 检查是否已在下载或已完成
     final existing = await _database.getDownloadedMedia(globalKey);
     if (existing != null &&
         (existing.status == DownloadStatus.downloading.index || existing.status == DownloadStatus.completed.index)) {
-      appLogger.i('Download already exists for $globalKey with status ${existing.status}');
+      appLogger.i('$globalKey 的下载已存在，状态为 ${existing.status}');
       return;
     }
 
-    // Insert into database
+    // 插入数据库
     await _database.insertDownload(
       serverId: metadata.serverId!,
       ratingKey: metadata.ratingKey,
@@ -251,11 +251,11 @@ class DownloadManagerService {
       status: DownloadStatus.queued.index,
     );
 
-    // Pin the already-cached API response for offline use
-    // (getMetadataWithImages was already called by download_provider, which cached with chapters/markers)
+    // 固定已缓存的 API 响应以供离线使用
+    // (getMetadataWithImages 之前已被 download_provider 调用，已缓存章节/标记)
     await _apiCache.pinForOffline(metadata.serverId!, metadata.ratingKey);
 
-    // Add to queue
+    // 添加到队列
     await _database.addToQueue(
       mediaGlobalKey: globalKey,
       priority: priority,
@@ -265,33 +265,33 @@ class DownloadManagerService {
 
     _emitProgress(globalKey, DownloadStatus.queued, 0);
 
-    // Start processing if not already
+    // 如果尚未开始，则启动队列处理
     _processQueue(client);
   }
 
-  /// Start processing the download queue - processes one item at a time
+  /// 开始处理下载队列 - 一次处理一个项目
   Future<void> _processQueue(PlexClient client) async {
     if (_isProcessingQueue) {
-      appLogger.d('Queue processing already in progress');
+      appLogger.d('队列处理已在进行中');
       return;
     }
 
     _isProcessingQueue = true;
-    _lastClient = client; // Cache for auto-resume
-    _setupConnectivityListener(); // Setup listener for auto-resume
+    _lastClient = client; // 缓存以便自动恢复
+    _setupConnectivityListener(); // 设置连接监听器以便自动恢复
 
     try {
       while (true) {
-        // Check if we should pause due to cellular
+        // 检查是否因移动网络而需要暂停
         if (await _shouldBlockDownload()) {
-          appLogger.i('Pausing downloads - on cellular data with WiFi-only enabled');
+          appLogger.i('暂停下载 - 处于移动网络且已启用“仅 WiFi 下载”');
           break;
         }
 
-        // Get next item from queue
+        // 从队列获取下一个项目
         final nextItem = await _database.getNextQueueItem();
         if (nextItem == null) {
-          appLogger.d('No more items in queue');
+          appLogger.d('队列中没有更多项目');
           break;
         }
 
@@ -302,64 +302,64 @@ class DownloadManagerService {
     }
   }
 
-  /// Setup connectivity listener to auto-resume downloads when WiFi becomes available
+  /// 设置连接状态监听器，以便在 WiFi 可用时自动恢复下载
   void _setupConnectivityListener() {
     _connectivitySubscription?.cancel();
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) async {
-      // If WiFi becomes available, try to resume queue
+      // 如果 WiFi 变得可用，尝试恢复队列
       if (results.contains(ConnectivityResult.wifi) || results.contains(ConnectivityResult.ethernet)) {
         final hasQueuedItems = await _database.getNextQueueItem() != null;
         if (hasQueuedItems && !_isProcessingQueue && _lastClient != null) {
-          appLogger.i('WiFi available - resuming downloads');
+          appLogger.i('WiFi 已连接 - 恢复下载');
           _processQueue(_lastClient!);
         }
       }
     });
   }
 
-  /// Start downloading a specific item
+  /// 开始下载特定项目
   Future<void> _startDownload(String globalKey, PlexClient client, DownloadQueueItem queueItem) async {
     try {
-      appLogger.i('Starting download for $globalKey');
+      appLogger.i('正在开始下载 $globalKey');
 
-      // Update status to downloading
+      // 更新状态为正在下载
       await _transitionStatus(globalKey, DownloadStatus.downloading);
-      appLogger.d('Status updated to downloading');
+      appLogger.d('状态已更新为正在下载');
 
-      // Parse globalKey to get serverId and ratingKey
+      // 解析 globalKey 以获取 serverId 和 ratingKey
       final parts = globalKey.split(':');
       final serverId = parts[0];
       final ratingKey = parts[1];
 
-      // Get metadata from cache
+      // 从缓存获取元数据
       final cachedResponse = await _apiCache.get(serverId, '/library/metadata/$ratingKey');
       if (cachedResponse == null) {
-        throw Exception('Metadata not found in cache for $globalKey');
+        throw Exception('在缓存中未找到 $globalKey 的元数据');
       }
 
-      // Parse metadata from cached response
+      // 从缓存响应中解析元数据
       final firstMetadata = PlexCacheParser.extractFirstMetadata(cachedResponse);
       if (firstMetadata == null) {
-        throw Exception('Invalid cached metadata for $globalKey');
+        throw Exception('$globalKey 的缓存元数据无效');
       }
       final metadata = PlexMetadata.fromJson(firstMetadata).copyWith(serverId: serverId);
 
-      // Get video playback data (includes URL, streams, etc.)
+      // 获取视频播放数据 (包括 URL、流信息等)
       final playbackData = await client.getVideoPlaybackData(metadata.ratingKey);
       if (playbackData.videoUrl == null) {
-        throw Exception('Could not get video URL');
+        throw Exception('无法获取视频 URL');
       }
 
-      // Cache playback extras (chapters + markers) for offline use
-      // This fetches and caches in one call
+      // 缓存播放额外内容 (章节 + 标记) 供离线使用
+      // 这一步会同时执行获取和缓存
       await client.getPlaybackExtras(metadata.ratingKey);
 
-      // Determine file extension from URL or default to mp4
+      // 从 URL 确定文件扩展名，默认为 mp4
       final extension = _getExtensionFromUrl(playbackData.videoUrl!) ?? 'mp4';
 
       final metadataWithServer = metadata;
 
-      // For episodes, look up the show's year from cached show metadata
+      // 对于剧集，从缓存的剧集元数据中查找剧集的年份
       int? showYear;
       if (metadataWithServer.type == 'episode' && metadataWithServer.grandparentRatingKey != null) {
         final showCached = await _apiCache.get(
@@ -373,22 +373,22 @@ class DownloadManagerService {
         }
       }
 
-      // Create cancel token
+      // 创建取消令牌
       final cancelToken = CancelToken();
       _activeDownloads[globalKey] = cancelToken;
 
-      appLogger.d('Starting video download for $globalKey');
+      appLogger.d('正在开始 $globalKey 的视频下载');
 
-      // Determine download path and handle SAF mode
+      // 确定下载路径并处理 SAF 模式
       final String downloadFilePath;
       final String storedPath;
 
       if (_storageService.isUsingSaf) {
-        // SAF mode: download to temp cache first, then copy to SAF
+        // SAF 模式：先下载到临时缓存，然后复制到 SAF
         final tempFileName = '${globalKey.replaceAll(':', '_')}.$extension';
         downloadFilePath = await _storageService.getTempDownloadPath(tempFileName);
 
-        // Download to temp path
+        // 下载到临时路径
         await _downloadFile(
           url: playbackData.videoUrl!,
           filePath: downloadFilePath,
@@ -396,9 +396,9 @@ class DownloadManagerService {
           cancelToken: cancelToken,
         );
 
-        appLogger.d('Video downloaded to temp, copying to SAF for $globalKey');
+        appLogger.d('视频已下载到临时路径，正在为 $globalKey 复制到 SAF');
 
-        // Copy to SAF
+        // 复制到 SAF
         final List<String> pathComponents;
         final String safFileName;
         if (metadataWithServer.type == 'movie') {
@@ -420,13 +420,13 @@ class DownloadManagerService {
         );
 
         if (safUri == null) {
-          throw Exception('Failed to copy video to SAF storage');
+          throw Exception('将视频复制到 SAF 存储失败');
         }
 
         storedPath = safUri;
-        appLogger.d('Video copied to SAF: $safUri');
+        appLogger.d('视频已复制到 SAF: $safUri');
       } else {
-        // Normal mode: download directly to final path
+        // 普通模式：直接下载到最终路径
         if (metadataWithServer.type == 'movie') {
           downloadFilePath = await _storageService.getMovieVideoPath(metadataWithServer, extension);
         } else if (metadataWithServer.type == 'episode') {
@@ -446,50 +446,50 @@ class DownloadManagerService {
           cancelToken: cancelToken,
         );
 
-        // Store relative path (survives iOS container UUID changes)
+        // 存储相对路径 (以应对 iOS 容器 UUID 变更)
         storedPath = await _storageService.toRelativePath(downloadFilePath);
       }
 
-      appLogger.d('Video download completed for $globalKey');
+      appLogger.d('$globalKey 的视频下载完成');
 
-      // Update database with stored path (SAF URI or relative path)
+      // 更新数据库中的存储路径 (SAF URI 或相对路径)
       await _database.updateVideoFilePath(globalKey, storedPath);
 
-      // Download artwork if enabled (only episode-specific artwork, not show/season)
-      // Use the passed queueItem's settings (not getNextQueueItem which would return the NEXT item)
+      // 如果启用，下载封面图 (仅剧集特定封面，非剧集/季封面)
+      // 使用传入的 queueItem 设置 (而非 getNextQueueItem，后者会返回下一个项目)
       if (queueItem.downloadArtwork) {
         await _downloadArtwork(globalKey, metadataWithServer, client, showYear: showYear);
 
-        // Download chapter thumbnails
+        // 下载章节缩略图
         await _downloadChapterThumbnails(metadataWithServer.serverId!, metadataWithServer.ratingKey, client);
       }
 
-      // Download subtitles if enabled
+      // 如果启用，下载字幕
       if (queueItem.downloadSubtitles && playbackData.mediaInfo != null) {
         await _downloadSubtitles(globalKey, metadataWithServer, playbackData.mediaInfo!, client, showYear: showYear);
       }
 
-      // Mark as completed
+      // 标记为已完成
       await _transitionStatus(globalKey, DownloadStatus.completed);
       await _database.removeFromQueue(globalKey);
 
       _activeDownloads.remove(globalKey);
 
-      appLogger.i('Download completed for $globalKey');
+      appLogger.i('$globalKey 的下载已完成');
     } catch (e) {
-      // Check if this was a user-initiated cancel/pause (not a real failure)
+      // 检查是否由用户发起的取消/暂停 (非真实失败)
       if (e is DioException && e.type == DioExceptionType.cancel) {
-        // Status was already set by pauseDownload() or cancelDownload()
-        // Just clean up and exit without marking as failed
-        appLogger.d('Download cancelled/paused for $globalKey: ${e.message}');
+        // 状态已由 pauseDownload() 或 cancelDownload() 设置
+        // 仅清理并退出，不标记为失败
+        appLogger.d('$globalKey 的下载已取消/暂停: ${e.message}');
         _activeDownloads.remove(globalKey);
         return;
       }
 
-      appLogger.e('Download failed for $globalKey', error: e);
+      appLogger.e('$globalKey 的下载失败', error: e);
       await _transitionStatus(globalKey, DownloadStatus.failed, errorMessage: e.toString());
       await _database.updateDownloadError(globalKey, e.toString());
-      // Remove from queue to prevent endless retry loop
+      // 从队列移除以防止陷入无限重试循环
       await _database.removeFromQueue(globalKey);
       _activeDownloads.remove(globalKey);
     }
@@ -512,7 +512,7 @@ class DownloadManagerService {
       filePath,
       cancelToken: cancelToken,
       onReceiveProgress: (received, total) {
-        // Calculate speed (update every 500ms)
+        // 计算速度 (每 500ms 更新一次)
         final now = DateTime.now();
         if (now.difference(lastUpdate).inMilliseconds >= 500) {
           final elapsedSeconds = now.difference(lastUpdate).inSeconds.clamp(1, double.infinity);
@@ -522,7 +522,7 @@ class DownloadManagerService {
 
           final progress = total > 0 ? ((received / total) * 100).round() : 0;
 
-          appLogger.d('Download progress: $progress% ($received/$total bytes) for $globalKey');
+          appLogger.d('下载进度: $progress% ($received/$total bytes) - $globalKey');
 
           _progressController.add(
             DownloadProgress(
@@ -536,7 +536,7 @@ class DownloadManagerService {
             ),
           );
 
-          // Update database asynchronously (non-blocking)
+          // 异步更新数据库 (非阻塞)
           _database.updateDownloadProgress(globalKey, progress, received, total).catchError((e) {
             appLogger.w('Failed to update download progress in DB', error: e);
           });
@@ -545,8 +545,8 @@ class DownloadManagerService {
     );
   }
 
-  /// Download artwork for a media item using hash-based storage
-  /// Downloads all artwork types: thumb/poster, clearLogo, and background art
+  /// 使用基于哈希的存储为媒体项目下载封面图
+  /// 下载所有封面图类型：缩略图/海报、透明 Logo 和背景图
   Future<void> _downloadArtwork(String globalKey, PlexMetadata metadata, PlexClient client, {int? showYear}) async {
     if (metadata.serverId == null) return;
 
@@ -555,88 +555,88 @@ class DownloadManagerService {
 
       final serverId = metadata.serverId!;
 
-      // Download thumb/poster
+      // 下载缩略图/海报
       if (metadata.thumb != null) {
         await _downloadSingleArtwork(serverId, metadata.thumb!, client);
       }
 
-      // Download clear logo
+      // 下载透明 Logo
       if (metadata.clearLogo != null) {
         await _downloadSingleArtwork(serverId, metadata.clearLogo!, client);
       }
 
-      // Download background art
+      // 下载背景图
       if (metadata.art != null) {
         await _downloadSingleArtwork(serverId, metadata.art!, client);
       }
 
-      // Store thumb reference in database (primary artwork for display)
+      // 在数据库中存储缩略图引用 (用于显示的主封面)
       await _database.updateArtworkPaths(globalKey: globalKey, thumbPath: metadata.thumb);
 
       _emitProgressWithArtwork(globalKey, thumbPath: metadata.thumb);
-      appLogger.d('Artwork downloaded for $globalKey');
+      appLogger.d('已为 $globalKey 下载封面图');
     } catch (e) {
-      appLogger.w('Failed to download artwork for $globalKey', error: e);
-      // Don't fail the entire download if artwork fails
+      appLogger.w('为 $globalKey 下载封面图失败', error: e);
+      // 如果封面图下载失败，不要让整个下载任务失败
     }
   }
 
-  /// Download a single artwork file if it doesn't already exist
+  /// 如果单个封面图文件尚不存在，则下载它
   Future<void> _downloadSingleArtwork(String serverId, String artworkPath, PlexClient client) async {
     try {
-      // Check if already downloaded (deduplication)
+      // 检查是否已下载 (去重)
       if (await _storageService.artworkExists(serverId, artworkPath)) {
-        appLogger.d('Artwork already exists: $artworkPath');
+        appLogger.d('封面图已存在: $artworkPath');
         return;
       }
 
       final url = client.getThumbnailUrl(artworkPath);
       if (url.isEmpty) {
-        appLogger.w('Empty thumbnail URL for: $artworkPath');
+        appLogger.w('缩略图 URL 为空: $artworkPath');
         return;
       }
 
       final filePath = await _storageService.getArtworkPathFromThumb(serverId, artworkPath);
       final file = File(filePath);
 
-      // Ensure parent directory exists
+      // 确保父目录存在
       await file.parent.create(recursive: true);
 
-      // Download the artwork
+      // 下载封面图
       await _dio.download(url, filePath);
-      appLogger.i('Downloaded artwork: $artworkPath -> $filePath');
+      appLogger.i('已下载封面图: $artworkPath -> $filePath');
     } catch (e, stack) {
-      appLogger.w('Failed to download artwork: $artworkPath', error: e, stackTrace: stack);
-      // Don't throw - artwork download failures shouldn't kill the entire download
+      appLogger.w('下载封面图失败: $artworkPath', error: e, stackTrace: stack);
+      // 不要抛出异常 - 封面图下载失败不应中断整个下载任务
     }
   }
 
-  /// Download all artwork for a metadata item (public method for parent metadata)
-  /// Downloads thumb/poster, clearLogo, and background art
+  /// 为元数据项下载所有封面图 (用于父级元数据的公共方法)
+  /// 下载缩略图/海报、透明 Logo 和背景图
   Future<void> downloadArtworkForMetadata(PlexMetadata metadata, PlexClient client) async {
     if (metadata.serverId == null) return;
     final serverId = metadata.serverId!;
 
-    // Download thumb/poster
+    // 下载缩略图/海报
     if (metadata.thumb != null) {
       await _downloadSingleArtwork(serverId, metadata.thumb!, client);
     }
 
-    // Download clear logo
+    // 下载透明 Logo
     if (metadata.clearLogo != null) {
       await _downloadSingleArtwork(serverId, metadata.clearLogo!, client);
     }
 
-    // Download background art
+    // 下载背景图
     if (metadata.art != null) {
       await _downloadSingleArtwork(serverId, metadata.art!, client);
     }
   }
 
-  /// Download chapter thumbnail images for a media item
+  /// 为媒体项目下载章节缩略图
   Future<void> _downloadChapterThumbnails(String serverId, String ratingKey, PlexClient client) async {
     try {
-      // Get chapters from the cached API response
+      // 从缓存的 API 响应中获取章节信息
       final extras = await client.getPlaybackExtras(ratingKey);
 
       for (final chapter in extras.chapters) {
@@ -646,15 +646,15 @@ class DownloadManagerService {
       }
 
       if (extras.chapters.isNotEmpty) {
-        appLogger.d('Downloaded ${extras.chapters.length} chapter thumbnails');
+        appLogger.d('已下载 ${extras.chapters.length} 个章节缩略图');
       }
     } catch (e) {
-      appLogger.w('Failed to download chapter thumbnails', error: e);
-      // Don't fail the entire download if chapter thumbnails fail
+      appLogger.w('下载章节缩略图失败', error: e);
+      // 如果章节缩略图下载失败，不要让整个下载任务失败
     }
   }
 
-  /// [showYear]: For episodes, pass the show's premiere year (not the episode's year)
+  /// [showYear]: 对于剧集，传递剧集的首播年份 (而非该集的年份)
   Future<void> _downloadSubtitles(
     String globalKey,
     PlexMetadata metadata,
@@ -666,7 +666,7 @@ class DownloadManagerService {
       _emitProgress(globalKey, DownloadStatus.downloading, 0, currentFile: 'subtitles');
 
       for (final subtitle in mediaInfo.subtitleTracks) {
-        // Only download external subtitles
+        // 仅下载外部字幕
         if (!subtitle.isExternal || subtitle.key == null) {
           continue;
         }
@@ -676,10 +676,10 @@ class DownloadManagerService {
         final subtitleUrl = subtitle.getSubtitleUrl(baseUrl, token);
         if (subtitleUrl == null) continue;
 
-        // Determine file extension
+        // 确定文件扩展名
         final extension = CodecUtils.getSubtitleExtension(subtitle.codec);
 
-        // Get user-friendly subtitle path based on media type
+        // 根据媒体类型获取用户友好的字幕路径
         final String subtitlePath;
         if (metadata.isEpisode) {
           subtitlePath = await _storageService.getEpisodeSubtitlePath(
@@ -691,7 +691,7 @@ class DownloadManagerService {
         } else if (metadata.isMovie) {
           subtitlePath = await _storageService.getMovieSubtitlePath(metadata, subtitle.id, extension);
         } else {
-          // Fallback to old structure
+          // 回退到旧结构
           subtitlePath = await _storageService.getSubtitlePath(
             metadata.serverId!,
             metadata.ratingKey,
@@ -700,16 +700,16 @@ class DownloadManagerService {
           );
         }
 
-        // Download subtitle file
+        // 下载字幕文件
         final file = File(subtitlePath);
         await file.parent.create(recursive: true);
         await _dio.download(subtitleUrl, subtitlePath);
 
-        appLogger.d('Downloaded subtitle ${subtitle.id} for $globalKey');
+        appLogger.d('已为 $globalKey 下载字幕 ${subtitle.id}');
       }
     } catch (e) {
-      appLogger.w('Failed to download subtitles for $globalKey', error: e);
-      // Don't fail the entire download if subtitles fail
+      appLogger.w('为 $globalKey 下载字幕失败', error: e);
+      // 如果字幕下载失败，不要让整个下载任务失败
     }
   }
 
@@ -740,13 +740,13 @@ class DownloadManagerService {
     );
   }
 
-  /// Update download status in database and emit progress notification.
+  /// 更新数据库中的下载状态并发送进度通知。
   ///
-  /// This helper combines two common operations:
-  /// 1. Update status in the database
-  /// 2. Emit progress to listeners
+  /// 此辅助方法结合了两个常见操作：
+  /// 1. 更新数据库中的状态
+  /// 2. 向监听器发送进度
   ///
-  /// Default progress is 0 for most statuses, 100 for completed.
+  /// 大多数状态的默认进度为 0，已完成状态为 100。
   Future<void> _transitionStatus(String globalKey, DownloadStatus status, {int? progress, String? errorMessage}) async {
     await _database.updateDownloadStatus(globalKey, status.index);
     _emitProgress(
@@ -757,10 +757,10 @@ class DownloadManagerService {
     );
   }
 
-  /// Emit progress update with artwork paths so DownloadProvider can sync
+  /// 发送包含封面图路径的进度更新，以便 DownloadProvider 同步
   void _emitProgressWithArtwork(String globalKey, {String? thumbPath}) {
-    // Emit a progress update containing artwork path
-    // The status is preserved as downloading since artwork is just one step
+    // 发送包含封面图路径的进度更新
+    // 状态保持为下载中，因为封面图只是其中一个步骤
     _progressController.add(
       DownloadProgress(
         globalKey: globalKey,
@@ -772,59 +772,59 @@ class DownloadManagerService {
     );
   }
 
-  /// Pause a download (works for both downloading and queued items)
+  /// 暂停下载 (适用于正在下载和队列中的项目)
   Future<void> pauseDownload(String globalKey) async {
-    // Cancel active download if exists
+    // 如果存在活跃下载，则取消
     final cancelToken = _activeDownloads[globalKey];
     if (cancelToken != null) {
-      cancelToken.cancel('Paused by user');
+      cancelToken.cancel('用户暂停');
       _activeDownloads.remove(globalKey);
     }
-    // Update status to paused and remove from queue so it doesn't restart
+    // 将状态更新为已暂停并从队列移除，以免重启
     await _transitionStatus(globalKey, DownloadStatus.paused);
     await _database.removeFromQueue(globalKey);
   }
 
-  /// Resume a paused download
+  /// 恢复已暂停的下载
   Future<void> resumeDownload(String globalKey, PlexClient client) async {
     await _transitionStatus(globalKey, DownloadStatus.queued);
-    // Re-add to queue (pauseDownload removes from queue)
+    // 重新添加到队列 (pauseDownload 会从队列移除)
     await _database.addToQueue(mediaGlobalKey: globalKey);
     _processQueue(client);
   }
 
-  /// Retry a failed download
+  /// 重试失败的下载
   Future<void> retryDownload(String globalKey, PlexClient client) async {
-    // Clear error and reset retry count
+    // 清除错误并重置重试计数
     await _database.clearDownloadError(globalKey);
-    // Reset status to queued
+    // 重置状态为队列中
     await _transitionStatus(globalKey, DownloadStatus.queued);
-    // Re-add to queue
+    // 重新添加到队列
     await _database.addToQueue(mediaGlobalKey: globalKey);
     _processQueue(client);
   }
 
-  /// Cancel a download
+  /// 取消下载
   Future<void> cancelDownload(String globalKey) async {
     final cancelToken = _activeDownloads[globalKey];
     if (cancelToken != null) {
-      cancelToken.cancel('Cancelled by user');
+      cancelToken.cancel('用户取消');
       _activeDownloads.remove(globalKey);
     }
     await _transitionStatus(globalKey, DownloadStatus.cancelled);
     await _database.removeFromQueue(globalKey);
   }
 
-  /// Delete a downloaded item and its files
+  /// 删除已下载的项目及其文件
   Future<void> deleteDownload(String globalKey) async {
-    // Cancel if actively downloading
+    // 如果正在活跃下载，则取消
     final cancelToken = _activeDownloads[globalKey];
     if (cancelToken != null) {
-      cancelToken.cancel('Download deleted');
+      cancelToken.cancel('下载已删除');
       _activeDownloads.remove(globalKey);
     }
 
-    // Delete files from storage
+    // 从存储中删除文件
     final parts = globalKey.split(':');
     if (parts.length != 2) {
       await _database.deleteDownload(globalKey);
@@ -836,31 +836,31 @@ class DownloadManagerService {
     final metadata = await _getMetadataFromCache(serverId, ratingKey);
 
     if (metadata == null) {
-      // Fallback deletion without progress
+      // 回退方案：不带进度删除
       await _deleteMediaFilesWithMetadata(serverId, ratingKey);
       await _apiCache.deleteForItem(serverId, ratingKey);
       await _database.deleteDownload(globalKey);
       return;
     }
 
-    // Determine total items to delete
+    // 确定要删除的项目总数
     final totalItems = await _getTotalItemsToDelete(metadata, serverId);
 
-    // Emit initial progress
+    // 发送初始进度
     _emitDeletionProgress(
       DeletionProgress(globalKey: globalKey, itemTitle: metadata.title, currentItem: 0, totalItems: totalItems),
     );
 
-    // Delete files from storage (with progress updates)
+    // 从存储中删除文件 (带进度更新)
     await _deleteMediaFilesWithMetadata(serverId, ratingKey);
 
-    // Delete from API cache
+    // 从 API 缓存中删除
     await _apiCache.deleteForItem(serverId, ratingKey);
 
-    // Delete from database
+    // 从数据库中删除
     await _database.deleteDownload(globalKey);
 
-    // Emit completion
+    // 发送完成通知
     _emitDeletionProgress(
       DeletionProgress(
         globalKey: globalKey,
@@ -871,24 +871,24 @@ class DownloadManagerService {
     );
   }
 
-  /// Emit deletion progress update
+  /// 发送删除进度更新
   void _emitDeletionProgress(DeletionProgress progress) {
     _deletionProgressController.add(progress);
   }
 
-  /// Calculate total items to delete (for progress tracking)
+  /// 计算要删除的项目总数 (用于进度追踪)
   Future<int> _getTotalItemsToDelete(PlexMetadata metadata, String serverId) async {
     switch (metadata.type.toLowerCase()) {
       case 'episode':
-        return 1; // Single episode
+        return 1; // 单个剧集
       case 'movie':
-        return 1; // Single movie
+        return 1; // 单个电影
       case 'season':
-        // Count episodes in season
+        // 计算季中的剧集数
         final episodes = await _database.getEpisodesBySeason(metadata.ratingKey);
         return episodes.length;
       case 'show':
-        // Count all episodes in show
+        // 计算剧集中的所有剧集数
         final episodes = await _database.getEpisodesByShow(metadata.ratingKey);
         return episodes.length;
       default:
@@ -896,24 +896,24 @@ class DownloadManagerService {
     }
   }
 
-  /// Delete media files using metadata to find correct paths
+  /// 使用元数据查找正确路径并删除媒体文件
   Future<void> _deleteMediaFilesWithMetadata(String serverId, String ratingKey) async {
     try {
-      // Get metadata from API cache
+      // 从 API 缓存获取元数据
       final metadata = await _getMetadataFromCache(serverId, ratingKey);
 
       if (metadata == null) {
-        // Fallback: Try database record
+        // 回退方案：尝试数据库记录
         final downloadRecord = await _database.getDownloadedMedia('$serverId:$ratingKey');
         if (downloadRecord?.videoFilePath != null) {
           await _deleteByFilePath(downloadRecord!);
           return;
         }
-        appLogger.w('Cannot delete - no metadata for $serverId:$ratingKey');
+        appLogger.w('无法删除 - 找不到 $serverId:$ratingKey 的元数据');
         return;
       }
 
-      // Delete based on type
+      // 根据类型删除
       switch (metadata.type.toLowerCase()) {
         case 'episode':
           await _deleteEpisodeFiles(metadata, serverId);
@@ -928,14 +928,14 @@ class DownloadManagerService {
           await _deleteMovieFiles(metadata, serverId);
           break;
         default:
-          appLogger.w('Unknown type for deletion: ${metadata.type}');
+          appLogger.w('未知的删除类型: ${metadata.type}');
       }
     } catch (e, stack) {
-      appLogger.e('Error deleting files', error: e, stackTrace: stack);
+      appLogger.e('删除文件出错', error: e, stackTrace: stack);
     }
   }
 
-  /// Get metadata from API cache
+  /// 从 API 缓存获取元数据
   Future<PlexMetadata?> _getMetadataFromCache(String serverId, String ratingKey) async {
     final cachedData = await _apiCache.get(serverId, '/library/metadata/$ratingKey');
     final metadataJson = PlexCacheParser.extractFirstMetadata(cachedData);
@@ -945,7 +945,7 @@ class DownloadManagerService {
     return null;
   }
 
-  /// Get chapter thumb paths from cached metadata
+  /// 从缓存的元数据中获取章节缩略图路径
   Future<List<String>> _getChapterThumbPaths(String serverId, String ratingKey) async {
     try {
       final cachedData = await _apiCache.get(serverId, '/library/metadata/$ratingKey');
@@ -958,48 +958,48 @@ class DownloadManagerService {
           .cast<String>()
           .toList();
     } catch (e) {
-      appLogger.w('Error getting chapter thumb paths for $ratingKey', error: e);
+      appLogger.w('获取 $ratingKey 的章节缩略图路径出错', error: e);
       return [];
     }
   }
 
-  /// Check if a chapter thumbnail is used by any other downloaded items
+  /// 检查章节缩略图是否被其他已下载项目使用
   Future<bool> _isChapterThumbnailInUse(String serverId, String thumbPath, String excludeRatingKey) async {
     try {
-      // Get all downloaded items
+      // 获取所有已下载项目
       final allItems = await _database.select(_database.downloadedMedia).get();
 
-      // Check if any other item uses this chapter thumbnail
+      // 检查是否有其他项目使用此章节缩略图
       for (final item in allItems) {
-        // Skip the item being deleted
+        // 跳过正在删除的项目
         if (item.ratingKey == excludeRatingKey) {
           continue;
         }
 
-        // Get chapter thumb paths for this item
+        // 获取此项目的章节缩略图路径
         final itemChapterPaths = await _getChapterThumbPaths(serverId, item.ratingKey);
 
-        // Check if this item has the same thumb path
+        // 检查此项目是否包含相同的缩略图路径
         if (itemChapterPaths.contains(thumbPath)) {
-          return true; // Thumbnail is in use
+          return true; // 缩略图正在使用中
         }
       }
 
-      return false; // Thumbnail is not in use
+      return false; // 缩略图未被使用
     } catch (e) {
-      appLogger.w('Error checking chapter thumbnail usage: $thumbPath', error: e);
-      // On error, assume in use to be safe (don't delete)
+      appLogger.w('检查章节缩略图使用情况出错: $thumbPath', error: e);
+      // 出错时，为安全起见假设正在使用 (不删除)
       return true;
     }
   }
 
-  /// Delete chapter thumbnails for a media item (with reference counting)
+  /// 删除媒体项目的章节缩略图 (带引用计数)
   Future<void> _deleteChapterThumbnails(String serverId, String ratingKey) async {
     try {
       final thumbPaths = await _getChapterThumbPaths(serverId, ratingKey);
 
       if (thumbPaths.isEmpty) {
-        appLogger.d('No chapter thumbnails to delete for $ratingKey');
+        appLogger.d('没有要删除的 $ratingKey 的章节缩略图');
         return;
       }
 
@@ -1008,36 +1008,36 @@ class DownloadManagerService {
 
       for (final thumbPath in thumbPaths) {
         try {
-          // Check if this thumbnail is used by other items
+          // 检查此缩略图是否被其他项目使用
           final inUse = await _isChapterThumbnailInUse(serverId, thumbPath, ratingKey);
 
           if (inUse) {
-            appLogger.d('Preserving chapter thumbnail (in use): $thumbPath');
+            appLogger.d('保留章节缩略图 (正在使用): $thumbPath');
             preservedCount++;
             continue;
           }
 
-          // Get artwork file path and delete
+          // 获取封面图文件路径并删除
           final artworkPath = await _storageService.getArtworkPathFromThumb(serverId, thumbPath);
-          if (await _deleteFileIfExists(File(artworkPath), 'chapter thumbnail')) {
+          if (await _deleteFileIfExists(File(artworkPath), '章节缩略图')) {
             deletedCount++;
           }
         } catch (e) {
-          appLogger.w('Failed to delete chapter thumbnail: $thumbPath', error: e);
-          // Continue with other chapters even if one fails
+          appLogger.w('删除章节缩略图失败: $thumbPath', error: e);
+          // 即使一个失败，也继续处理其他章节
         }
       }
 
       if (deletedCount > 0 || preservedCount > 0) {
-        appLogger.i('Deleted $deletedCount of ${thumbPaths.length} chapter thumbnails ($preservedCount preserved)');
+        appLogger.i('删除了 ${thumbPaths.length} 个章节缩略图中的 $deletedCount 个 (保留了 $preservedCount 个)');
       }
     } catch (e, stack) {
-      appLogger.w('Error deleting chapter thumbnails for $ratingKey', error: e, stackTrace: stack);
-      // Don't throw - chapter deletion shouldn't block main deletion
+      appLogger.w('删除 $ratingKey 的章节缩略图出错', error: e, stackTrace: stack);
+      // 不要抛出异常 - 章节删除不应阻塞主删除流程
     }
   }
 
-  /// Delete episode files
+  /// 删除剧集文件
   Future<void> _deleteEpisodeFiles(PlexMetadata episode, String serverId) async {
     try {
       final parentMetadata = episode.grandparentRatingKey != null
@@ -1045,36 +1045,36 @@ class DownloadManagerService {
           : null;
       final showYear = parentMetadata?.year;
 
-      // Delete video file
+      // 删除视频文件
       final videoPathTemplate = await _storageService.getEpisodeVideoPath(episode, 'tmp', showYear: showYear);
       final videoPathWithoutExt = videoPathTemplate.substring(0, videoPathTemplate.lastIndexOf('.'));
       final actualVideoFile = await _findFileWithAnyExtension(videoPathWithoutExt);
       if (actualVideoFile != null) {
-        await _deleteFileIfExists(actualVideoFile, 'episode video');
+        await _deleteFileIfExists(actualVideoFile, '剧集视频');
       }
 
-      // Delete thumbnail
+      // 删除缩略图
       final thumbPath = await _storageService.getEpisodeThumbnailPath(episode, showYear: showYear);
-      await _deleteFileIfExists(File(thumbPath), 'episode thumbnail');
+      await _deleteFileIfExists(File(thumbPath), '剧集缩略图');
 
-      // Delete subtitles directory
+      // 删除字幕目录
       final subsDir = await _storageService.getEpisodeSubtitlesDirectory(episode, showYear: showYear);
       if (await subsDir.exists()) {
         await subsDir.delete(recursive: true);
-        appLogger.i('Deleted episode subtitles: ${subsDir.path}');
+        appLogger.i('已删除剧集字幕: ${subsDir.path}');
       }
 
-      // Delete chapter thumbnails (with reference counting)
+      // 删除章节缩略图 (带引用计数)
       await _deleteChapterThumbnails(serverId, episode.ratingKey);
 
-      // Clean up parent directories if empty
+      // 如果父目录为空，则清理
       await _cleanupEmptyDirectories(episode, showYear);
     } catch (e, stack) {
-      appLogger.e('Error deleting episode files', error: e, stackTrace: stack);
+      appLogger.e('删除剧集文件出错', error: e, stackTrace: stack);
     }
   }
 
-  /// Delete season files
+  /// 删除季文件
   Future<void> _deleteSeasonFiles(PlexMetadata season, String serverId) async {
     try {
       final parentMetadata = season.parentRatingKey != null
@@ -1082,10 +1082,10 @@ class DownloadManagerService {
           : null;
       final showYear = parentMetadata?.year;
 
-      // Get all episodes in this season
+      // 获取此季中的所有剧集
       final episodesInSeason = await _database.getEpisodesBySeason(season.ratingKey);
 
-      appLogger.d('Deleting ${episodesInSeason.length} episodes in season ${season.ratingKey}');
+      appLogger.d('正在删除季 ${season.ratingKey} 中的 ${episodesInSeason.length} 个剧集');
       await _deleteEpisodesInCollection(
         episodes: episodesInSeason,
         serverId: serverId,
@@ -1096,17 +1096,17 @@ class DownloadManagerService {
       final seasonDir = await _storageService.getSeasonDirectory(season, showYear: showYear);
       if (await seasonDir.exists()) {
         await seasonDir.delete(recursive: true);
-        appLogger.i('Deleted season directory: ${seasonDir.path}');
+        appLogger.i('已删除季目录: ${seasonDir.path}');
       }
 
       await _cleanupShowDirectory(season, showYear);
     } catch (e, stack) {
-      appLogger.e('Error deleting season files', error: e, stackTrace: stack);
+      appLogger.e('删除季文件出错', error: e, stackTrace: stack);
     }
   }
 
-  /// Delete episodes in a collection (season or show)
-  /// Returns the number of episodes deleted
+  /// 删除集合中的剧集 (季或剧集)
+  /// 返回删除的剧集数
   Future<void> _deleteEpisodesInCollection({
     required List<DownloadedMediaItem> episodes,
     required String serverId,
@@ -1117,38 +1117,38 @@ class DownloadManagerService {
       final episode = episodes[i];
       final episodeGlobalKey = '$serverId:${episode.ratingKey}';
 
-      // Emit progress update
+      // 发送进度更新
       _emitDeletionProgress(
         DeletionProgress(
           globalKey: '$serverId:$parentKey',
           itemTitle: parentTitle,
           currentItem: i + 1,
           totalItems: episodes.length,
-          currentOperation: 'Deleting episode ${i + 1} of ${episodes.length}',
+          currentOperation: '正在删除第 ${i + 1}/${episodes.length} 个剧集',
         ),
       );
 
-      // Delete chapter thumbnails
+      // 删除章节缩略图
       await _deleteChapterThumbnails(serverId, episode.ratingKey);
 
-      // Delete episode files (video, subtitles)
+      // 删除剧集文件 (视频、字幕)
       await _deleteByFilePath(episode);
 
-      // Delete episode from API cache
+      // 从 API 缓存中删除剧集
       await _apiCache.deleteForItem(serverId, episode.ratingKey);
 
-      // Delete episode DB entry
+      // 删除剧集数据库条目
       await _database.deleteDownload(episodeGlobalKey);
     }
   }
 
-  /// Delete show files
+  /// 删除剧集文件
   Future<void> _deleteShowFiles(PlexMetadata show, String serverId) async {
     try {
-      // Get all episodes in this show
+      // 获取此剧集中的所有剧集
       final episodesInShow = await _database.getEpisodesByShow(show.ratingKey);
 
-      appLogger.d('Deleting ${episodesInShow.length} episodes in show ${show.ratingKey}');
+      appLogger.d('正在删除剧集 ${show.ratingKey} 中的 ${episodesInShow.length} 个剧集');
       await _deleteEpisodesInCollection(
         episodes: episodesInShow,
         serverId: serverId,
@@ -1159,30 +1159,30 @@ class DownloadManagerService {
       final showDir = await _storageService.getShowDirectory(show);
       if (await showDir.exists()) {
         await showDir.delete(recursive: true);
-        appLogger.i('Deleted show directory: ${showDir.path}');
+        appLogger.i('已删除剧集目录: ${showDir.path}');
       }
     } catch (e, stack) {
-      appLogger.e('Error deleting show files', error: e, stackTrace: stack);
+      appLogger.e('删除剧集文件出错', error: e, stackTrace: stack);
     }
   }
 
-  /// Delete movie files
+  /// 删除电影文件
   Future<void> _deleteMovieFiles(PlexMetadata movie, String serverId) async {
     try {
       final movieDir = await _storageService.getMovieDirectory(movie);
       if (await movieDir.exists()) {
         await movieDir.delete(recursive: true);
-        appLogger.i('Deleted movie directory: ${movieDir.path}');
+        appLogger.i('已删除电影目录: ${movieDir.path}');
       }
 
-      // Delete chapter thumbnails (with reference counting)
+      // 删除章节缩略图 (带引用计数)
       await _deleteChapterThumbnails(serverId, movie.ratingKey);
     } catch (e, stack) {
-      appLogger.e('Error deleting movie files', error: e, stackTrace: stack);
+      appLogger.e('删除电影文件出错', error: e, stackTrace: stack);
     }
   }
 
-  /// Clean up empty directories after deleting episode
+  /// 删除剧集后清理空目录
   Future<void> _cleanupEmptyDirectories(PlexMetadata episode, int? showYear) async {
     final seasonDir = await _storageService.getSeasonDirectory(episode, showYear: showYear);
 
@@ -1201,14 +1201,14 @@ class DownloadManagerService {
       if (!hasVideos) {
         if (!await _isSeasonArtworkInUse(episode, showYear)) {
           await seasonDir.delete(recursive: true);
-          appLogger.i('Deleted empty season directory: ${seasonDir.path}');
+          appLogger.i('已删除空季目录: ${seasonDir.path}');
           await _cleanupShowDirectory(episode, showYear);
         }
       }
     }
   }
 
-  /// Clean up show directory if empty
+  /// 如果为空则清理剧集目录
   Future<void> _cleanupShowDirectory(PlexMetadata metadata, int? showYear) async {
     final showDir = await _storageService.getShowDirectory(metadata, showYear: showYear);
 
@@ -1219,30 +1219,30 @@ class DownloadManagerService {
       if (!hasSeasons) {
         if (!await _isShowArtworkInUse(metadata, showYear)) {
           await showDir.delete(recursive: true);
-          appLogger.i('Deleted empty show directory: ${showDir.path}');
+          appLogger.i('已删除空剧集目录: ${showDir.path}');
         }
       }
     }
   }
 
-  /// Check if season artwork is in use
+  /// 检查季封面图是否在使用中
   Future<bool> _isSeasonArtworkInUse(PlexMetadata episode, int? showYear) async {
     final seasonKey = episode.parentRatingKey;
     if (seasonKey == null) return false;
 
     final otherEpisodes = await _database.getEpisodesBySeason(seasonKey);
 
-    // Check if any episodes besides this one
+    // 检查除此剧集外是否还有其他剧集
     return otherEpisodes.any((e) => e.globalKey != '${episode.serverId}:${episode.ratingKey}');
   }
 
-  /// Check if show artwork is in use
+  /// 检查剧集封面图是否在使用中
   Future<bool> _isShowArtworkInUse(PlexMetadata metadata, int? showYear) async {
     final showKey = metadata.grandparentRatingKey ?? metadata.parentRatingKey ?? metadata.ratingKey;
 
     final allItems = await _database.select(_database.downloadedMedia).get();
 
-    // Check if any items belong to this show besides this one
+    // 检查除此项目外是否还有其他属于此剧集的项目
     return allItems.any(
       (item) =>
           (item.grandparentRatingKey == showKey || item.parentRatingKey == showKey) &&
@@ -1250,7 +1250,7 @@ class DownloadManagerService {
     );
   }
 
-  /// Find file with any extension
+  /// 查找具有任意扩展名的文件
   Future<File?> _findFileWithAnyExtension(String pathWithoutExt) async {
     final dir = Directory(path.dirname(pathWithoutExt));
     final baseName = path.basename(pathWithoutExt);
@@ -1265,71 +1265,71 @@ class DownloadManagerService {
 
       return files.isNotEmpty ? files.first as File : null;
     } catch (e) {
-      appLogger.w('Error finding file: $pathWithoutExt', error: e);
+      appLogger.w('查找文件出错: $pathWithoutExt', error: e);
       return null;
     }
   }
 
-  /// Fallback deletion using file paths from database
+  /// 使用数据库中的文件路径进行回退删除
   Future<void> _deleteByFilePath(DownloadedMediaItem record) async {
     try {
       if (record.videoFilePath != null) {
         final videoPath = await _storageService.toAbsolutePath(record.videoFilePath!);
-        final videoDeleted = await _deleteFileIfExists(File(videoPath), 'video file');
+        final videoDeleted = await _deleteFileIfExists(File(videoPath), '视频文件');
 
-        // Delete subtitle directory if video was deleted
+        // 如果视频已删除，则删除字幕目录
         if (videoDeleted) {
           final subsPath = videoPath.replaceAll(RegExp(r'\.[^.]+$'), '_subs');
           final subsDir = Directory(subsPath);
           if (await subsDir.exists()) {
             await subsDir.delete(recursive: true);
-            appLogger.i('Deleted subtitles: $subsPath');
+            appLogger.i('已删除字幕: $subsPath');
           }
         }
       }
 
       if (record.thumbPath != null) {
         final thumbPath = await _storageService.toAbsolutePath(record.thumbPath!);
-        await _deleteFileIfExists(File(thumbPath), 'thumbnail');
+        await _deleteFileIfExists(File(thumbPath), '缩略图');
       }
     } catch (e, stack) {
-      appLogger.e('Error in fallback deletion', error: e, stackTrace: stack);
+      appLogger.e('回退删除出错', error: e, stackTrace: stack);
     }
   }
 
-  /// Get all downloads with a specific status
+  /// 获取具有特定状态的所有下载项目
   Stream<List<DownloadedMediaItem>> watchDownloadsByStatus(DownloadStatus status) {
     return (_database.select(_database.downloadedMedia)..where((t) => t.status.equals(status.index))).watch();
   }
 
-  /// Get all downloaded media items (for loading persisted data)
+  /// 获取所有已下载的媒体项目 (用于加载持久化数据)
   Future<List<DownloadedMediaItem>> getAllDownloads() async {
     return _database.select(_database.downloadedMedia).get();
   }
 
-  /// Get a specific downloaded media item by globalKey
+  /// 根据 globalKey 获取特定的已下载媒体项目
   Future<DownloadedMediaItem?> getDownloadedMedia(String globalKey) async {
     return _database.getDownloadedMedia(globalKey);
   }
 
-  /// Save metadata for a media item (show, season, movie, or episode)
-  /// Used to persist parent metadata (shows/seasons) for offline display
+  /// 保存媒体项目 (剧集、季、电影或剧集) 的元数据
+  /// 用于持久化父级元数据 (剧集/季)，以便离线显示
   Future<void> saveMetadata(PlexMetadata metadata) async {
     if (metadata.serverId == null) {
-      appLogger.w('Cannot save metadata without serverId');
+      appLogger.w('没有 serverId 无法保存元数据');
       return;
     }
 
-    // Cache to API cache for offline use
+    // 缓存到 API 缓存以便离线使用
     await _cacheMetadataForOffline(metadata.serverId!, metadata.ratingKey, metadata);
   }
 
-  /// Cache metadata in the API response format for offline access
-  /// This simulates what PlexClient would receive from the server
+  /// 以 API 响应格式缓存元数据以便离线访问
+  /// 这模拟了 PlexClient 从服务器接收到的内容
   Future<void> _cacheMetadataForOffline(String serverId, String ratingKey, PlexMetadata metadata) async {
     final endpoint = '/library/metadata/$ratingKey';
 
-    // Build a response structure that matches the Plex API format
+    // 构建匹配 Plex API 格式的响应结构
     final cachedResponse = {
       'MediaContainer': {
         'Metadata': [metadata.toJson()],
@@ -1340,11 +1340,11 @@ class DownloadManagerService {
     await _apiCache.pinForOffline(serverId, ratingKey);
   }
 
-  /// Cache children (seasons or episodes) in the API response format
+  /// 以 API 响应格式缓存子项 (季或剧集)
   Future<void> cacheChildrenForOffline(String serverId, String parentRatingKey, List<PlexMetadata> children) async {
     final endpoint = '/library/metadata/$parentRatingKey/children';
 
-    // Build a response structure that matches the Plex API format
+    // 构建匹配 Plex API 格式的响应结构
     final cachedResponse = {
       'MediaContainer': {'Metadata': children.map((c) => c.toJson()).toList()},
     };
@@ -1355,7 +1355,7 @@ class DownloadManagerService {
   void dispose() {
     _connectivitySubscription?.cancel();
     for (final token in _activeDownloads.values) {
-      token.cancel('Service disposed');
+      token.cancel('服务已销毁');
     }
     _progressController.close();
     _deletionProgressController.close();
